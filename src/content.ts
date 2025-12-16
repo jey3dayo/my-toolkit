@@ -12,7 +12,13 @@
     | { action: "enableTableSort" }
     | { action: "showNotification"; message: string }
     | { action: "getSummaryTargetText" }
-    | { action: "showSummaryOverlay"; summary: string; source: SummarySource };
+    | {
+        action: "showSummaryOverlay";
+        status: "loading" | "ready" | "error";
+        source: SummarySource;
+        summary?: string;
+        error?: string;
+      };
 
   type SummaryTarget = {
     text: string;
@@ -39,6 +45,24 @@
   let lastAutoSummaryText = "";
   let lastAutoSummaryResult: { summary: string; source: SummarySource } | null =
     null;
+  let overlayEls: {
+    host: HTMLDivElement;
+    title: HTMLDivElement;
+    content: HTMLDivElement;
+    primaryText: HTMLPreElement;
+    secondaryText: HTMLPreElement;
+    copyButton: HTMLButtonElement;
+    eventButton: HTMLButtonElement;
+    openCalendarButton: HTMLButtonElement;
+    copyLinkButton: HTMLButtonElement;
+    closeButton: HTMLButtonElement;
+  } | null = null;
+  let overlayCleanup: (() => void) | null = null;
+  let overlayMode: "summary" | "event" = "summary";
+  let overlaySummaryText = "";
+  let overlayEventText = "";
+  let overlayCalendarUrl = "";
+  let overlayAnchor: DOMRect | null = null;
 
   // ========================================
   // 1. ユーティリティ関数
@@ -92,7 +116,7 @@
       }
 
       if (request.action === "showSummaryOverlay") {
-        showSummaryOverlay(request.summary, request.source);
+        showSummaryOverlay(request);
       }
 
       return true;
@@ -325,86 +349,229 @@
       .trim();
   }
 
-  function showSummaryOverlay(summary: string, source: SummarySource): void {
-    const existing = document.getElementById("my-browser-utils-summary");
-    if (existing) existing.remove();
+  function ensureOverlay(): NonNullable<typeof overlayEls> {
+    if (overlayEls) return overlayEls;
 
-    const root = document.createElement("div");
-    root.id = "my-browser-utils-summary";
-    root.style.cssText = `
-    position: fixed;
-    right: 16px;
-    top: 16px;
-    width: min(480px, calc(100vw - 32px));
-    max-height: 60vh;
-    z-index: 2147483647;
-    background: #fff;
-    border: 1px solid rgba(0,0,0,0.12);
-    border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.22);
-    overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  `;
+    const legacy = document.getElementById("my-browser-utils-summary");
+    if (legacy) legacy.remove();
+
+    const host = document.createElement("div");
+    host.id = "my-browser-utils-overlay";
+    host.style.cssText = `
+      all: initial;
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 2147483647;
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+
+    const shadow = host.attachShadow({ mode: "open" });
+    const style = document.createElement("style");
+    style.textContent = `
+      :host { all: initial; }
+      *, *::before, *::after { box-sizing: border-box; font-family: inherit; }
+
+      .panel {
+        width: min(520px, calc(100vw - 32px));
+        max-height: min(60vh, 720px);
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 14px;
+        box-shadow: 0 16px 44px rgba(0,0,0,0.28);
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px 14px;
+        background: #f7f7f7;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+      }
+
+      .title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #111;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      button {
+        appearance: none;
+        border: none;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+      .btn-primary { background: #4285f4; color: #fff; }
+      .btn-dark { background: #111827; color: #fff; }
+      .btn-quiet { background: #6b7280; color: #fff; }
+
+      .body {
+        padding: 14px;
+        overflow: auto;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: #f3f4f6;
+        color: #111;
+        margin-bottom: 12px;
+        font-size: 13px;
+      }
+
+      .spinner {
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        border: 2px solid rgba(0,0,0,0.18);
+        border-top-color: rgba(0,0,0,0.60);
+        animation: spin 0.7s linear infinite;
+        flex: 0 0 auto;
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #111;
+      }
+
+      .secondary {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(0,0,0,0.08);
+        color: rgba(17,17,17,0.85);
+        font-size: 12px;
+      }
+    `;
+
+    const panel = document.createElement("div");
+    panel.className = "panel";
 
     const header = document.createElement("div");
-    header.style.cssText = `
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px 12px;
-    background: #f7f7f7;
-    border-bottom: 1px solid rgba(0,0,0,0.08);
-  `;
+    header.className = "header";
 
     const title = document.createElement("div");
-    title.textContent =
-      source === "selection" ? "要約（選択範囲）" : "要約（ページ本文）";
-    title.style.cssText = `
-    font-size: 13px;
-    font-weight: 700;
-    color: #111;
-  `;
+    title.className = "title";
 
     const actions = document.createElement("div");
-    actions.style.cssText = `
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  `;
+    actions.className = "actions";
 
     const copyButton = document.createElement("button");
+    copyButton.className = "btn-primary";
     copyButton.textContent = "コピー";
-    copyButton.style.cssText = `
-    padding: 6px 10px;
-    font-size: 12px;
-    border: none;
-    border-radius: 6px;
-    background: #4285f4;
-    color: white;
-    cursor: pointer;
-  `;
-    copyButton.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(summary);
-        showNotification("コピーしました");
-      } catch {
-        showNotification("コピーに失敗しました");
-      }
-    });
 
     const eventButton = document.createElement("button");
+    eventButton.className = "btn-dark";
     eventButton.textContent = "イベント";
-    eventButton.style.cssText = `
-    padding: 6px 10px;
-    font-size: 12px;
-    border: none;
-    border-radius: 6px;
-    background: #111827;
-    color: white;
-    cursor: pointer;
-  `;
-    eventButton.addEventListener("click", () => {
+
+    const openCalendarButton = document.createElement("button");
+    openCalendarButton.className = "btn-primary";
+    openCalendarButton.textContent = "カレンダー";
+
+    const copyLinkButton = document.createElement("button");
+    copyLinkButton.className = "btn-quiet";
+    copyLinkButton.textContent = "リンクコピー";
+
+    const closeButton = document.createElement("button");
+    closeButton.className = "btn-quiet";
+    closeButton.textContent = "閉じる";
+
+    actions.appendChild(copyButton);
+    actions.appendChild(eventButton);
+    actions.appendChild(openCalendarButton);
+    actions.appendChild(copyLinkButton);
+    actions.appendChild(closeButton);
+    header.appendChild(title);
+    header.appendChild(actions);
+
+    const body = document.createElement("div");
+    body.className = "body";
+
+    const content = document.createElement("div");
+    const primaryText = document.createElement("pre");
+    const secondaryText = document.createElement("pre");
+    secondaryText.className = "secondary";
+
+    content.appendChild(primaryText);
+    content.appendChild(secondaryText);
+    body.appendChild(content);
+
+    panel.appendChild(header);
+    panel.appendChild(body);
+
+    shadow.appendChild(style);
+    shadow.appendChild(panel);
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        closeOverlay();
+      }
+    };
+
+    const onCopy = (): void => {
+      const text =
+        overlayMode === "event" ? overlayEventText : overlaySummaryText;
+      if (!text) return;
+      void (async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          showNotification("コピーしました");
+        } catch {
+          showNotification("コピーに失敗しました");
+        }
+      })();
+    };
+
+    const onOpenCalendar = (): void => {
+      if (!overlayCalendarUrl) return;
+      window.open(overlayCalendarUrl, "_blank", "noopener,noreferrer");
+    };
+
+    const onCopyLink = (): void => {
+      if (!overlayCalendarUrl) return;
+      void (async () => {
+        try {
+          await navigator.clipboard.writeText(overlayCalendarUrl);
+          showNotification("コピーしました");
+        } catch {
+          showNotification("コピーに失敗しました");
+        }
+      })();
+    };
+
+    const onEvent = (): void => {
       void (async () => {
         if (eventButton) eventButton.disabled = true;
         const prevText = eventButton.textContent;
@@ -426,13 +593,13 @@
           });
 
           if (!response.ok) {
-            showNotification(response.error);
+            showEventOverlayError(response.error);
             return;
           }
 
           showEventOverlay(response.eventText, response.calendarUrl);
         } catch (error) {
-          showNotification(
+          showEventOverlayError(
             error instanceof Error
               ? error.message
               : "イベント要約に失敗しました",
@@ -442,197 +609,235 @@
           eventButton.disabled = false;
         }
       })();
-    });
+    };
 
-    const closeButton = document.createElement("button");
-    closeButton.textContent = "閉じる";
-    closeButton.style.cssText = `
-    padding: 6px 10px;
-    font-size: 12px;
-    border: none;
-    border-radius: 6px;
-    background: #6b7280;
-    color: white;
-    cursor: pointer;
-  `;
-    closeButton.addEventListener("click", () => root.remove());
+    window.addEventListener("keydown", onKeyDown, true);
+    closeButton.addEventListener("click", closeOverlay);
+    copyButton.addEventListener("click", onCopy);
+    openCalendarButton.addEventListener("click", onOpenCalendar);
+    copyLinkButton.addEventListener("click", onCopyLink);
+    eventButton.addEventListener("click", onEvent);
 
-    actions.appendChild(copyButton);
-    if (source === "selection") {
-      actions.appendChild(eventButton);
+    overlayCleanup = () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      closeButton.removeEventListener("click", closeOverlay);
+      copyButton.removeEventListener("click", onCopy);
+      openCalendarButton.removeEventListener("click", onOpenCalendar);
+      copyLinkButton.removeEventListener("click", onCopyLink);
+      eventButton.removeEventListener("click", onEvent);
+    };
+
+    (document.documentElement ?? document.body ?? document).appendChild(host);
+
+    overlayEls = {
+      host,
+      title,
+      content,
+      primaryText,
+      secondaryText,
+      copyButton,
+      eventButton,
+      openCalendarButton,
+      copyLinkButton,
+      closeButton,
+    };
+
+    return overlayEls;
+  }
+
+  function closeOverlay(): void {
+    if (overlayCleanup) overlayCleanup();
+    overlayCleanup = null;
+    overlayEls?.host.remove();
+    overlayEls = null;
+    overlayMode = "summary";
+    overlaySummaryText = "";
+    overlayEventText = "";
+    overlayCalendarUrl = "";
+    overlayAnchor = null;
+  }
+
+  function setOverlayTitle(text: string): void {
+    const els = ensureOverlay();
+    els.title.textContent = text;
+  }
+
+  function setOverlayActionsVisibility(nextMode: "summary" | "event"): void {
+    const els = ensureOverlay();
+    const isSummary = nextMode === "summary";
+    els.eventButton.style.display = isSummary ? "" : "none";
+    els.openCalendarButton.style.display = isSummary ? "none" : "";
+    els.copyLinkButton.style.display = isSummary ? "none" : "";
+  }
+
+  function setOverlayContent(
+    primary: string,
+    secondary: string,
+    status: "loading" | "ready" | "error",
+  ): void {
+    const els = ensureOverlay();
+    els.primaryText.textContent = primary;
+    els.secondaryText.textContent = secondary;
+    els.secondaryText.style.display = secondary ? "" : "none";
+
+    if (status === "loading") {
+      els.content.prepend(createStatusRow("要約中...", true));
+    } else if (status === "error") {
+      els.content.prepend(createStatusRow("エラー", false));
+    } else {
+      const existing = els.content.querySelector(".status");
+      if (existing) existing.remove();
     }
-    actions.appendChild(closeButton);
-    header.appendChild(title);
-    header.appendChild(actions);
+  }
 
-    const body = document.createElement("div");
-    body.style.cssText = `
-    padding: 12px;
-    overflow: auto;
-    max-height: calc(60vh - 44px);
-  `;
+  function createStatusRow(text: string, spinning: boolean): HTMLDivElement {
+    const els = ensureOverlay();
+    const existing = els.content.querySelector(".status");
+    if (existing) existing.remove();
 
-    const pre = document.createElement("pre");
-    pre.textContent = summary;
-    pre.style.cssText = `
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-size: 13px;
-    line-height: 1.45;
-    color: #111;
-  `;
+    const row = document.createElement("div");
+    row.className = "status";
+    if (spinning) {
+      const spinner = document.createElement("div");
+      spinner.className = "spinner";
+      row.appendChild(spinner);
+    }
+    const label = document.createElement("div");
+    label.textContent = text;
+    row.appendChild(label);
+    return row;
+  }
 
-    body.appendChild(pre);
-    root.appendChild(header);
-    root.appendChild(body);
-    document.body.appendChild(root);
+  function getSelectionAnchorRect(): DOMRect | null {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+
+    const range = selection.getRangeAt(0);
+    const rects = Array.from(range.getClientRects());
+    const rect =
+      rects.length > 0
+        ? rects[rects.length - 1]
+        : range.getBoundingClientRect();
+
+    if (!rect || (rect.width === 0 && rect.height === 0)) return null;
+    return rect;
+  }
+
+  function positionOverlay(): void {
+    const els = ensureOverlay();
+
+    const margin = 16;
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight;
+
+    const hostRect = els.host.getBoundingClientRect();
+    const width = hostRect.width || 520;
+    const height = hostRect.height || 300;
+
+    const anchor = overlayAnchor;
+    if (!anchor) {
+      const left = Math.max(margin, viewportW - width - margin);
+      els.host.style.left = `${Math.round(left)}px`;
+      els.host.style.top = `${margin}px`;
+      return;
+    }
+
+    const preferredLeft = anchor.left;
+    const preferredTop = anchor.bottom + 10;
+
+    const left = Math.min(
+      Math.max(margin, preferredLeft),
+      Math.max(margin, viewportW - width - margin),
+    );
+
+    const top = Math.min(
+      Math.max(margin, preferredTop),
+      Math.max(margin, viewportH - height - margin),
+    );
+
+    els.host.style.left = `${Math.round(left)}px`;
+    els.host.style.top = `${Math.round(top)}px`;
+  }
+
+  function showSummaryOverlay(
+    request: Extract<ContentRequest, { action: "showSummaryOverlay" }>,
+  ): void {
+    overlayMode = "summary";
+    setOverlayActionsVisibility("summary");
+
+    const source = request.source;
+    const title =
+      source === "selection" ? "要約（選択範囲）" : "要約（ページ本文）";
+    setOverlayTitle(title);
+
+    const els = ensureOverlay();
+    overlayAnchor = source === "selection" ? getSelectionAnchorRect() : null;
+
+    const summary = request.summary?.trim() ?? "";
+    const error = request.error?.trim() ?? "";
+
+    if (request.status === "loading") {
+      overlaySummaryText = "";
+      els.copyButton.disabled = true;
+      els.eventButton.disabled = true;
+      els.eventButton.style.display = source === "selection" ? "" : "none";
+      setOverlayContent("", "処理に数秒かかることがあります。", "loading");
+      requestAnimationFrame(positionOverlay);
+      return;
+    }
+
+    if (request.status === "error") {
+      overlaySummaryText = "";
+      els.copyButton.disabled = true;
+      els.eventButton.disabled = true;
+      els.eventButton.style.display = "none";
+      setOverlayContent(
+        error || "要約に失敗しました",
+        "OpenAI API Token未設定の場合は、拡張機能のポップアップ「設定」タブで設定してください。",
+        "error",
+      );
+      requestAnimationFrame(positionOverlay);
+      return;
+    }
+
+    overlaySummaryText = summary;
+    els.copyButton.disabled = !summary;
+    els.eventButton.disabled = false;
+    els.eventButton.style.display = source === "selection" ? "" : "none";
+    setOverlayContent(summary || "要約結果が空でした", "", "ready");
+    requestAnimationFrame(positionOverlay);
   }
 
   function showEventOverlay(eventText: string, calendarUrl: string): void {
-    const existing = document.getElementById("my-browser-utils-summary");
-    if (existing) existing.remove();
+    overlayMode = "event";
+    overlayEventText = eventText;
+    overlayCalendarUrl = calendarUrl;
+    overlayAnchor = getSelectionAnchorRect();
+    setOverlayActionsVisibility("event");
+    setOverlayTitle("イベント要約");
 
-    const root = document.createElement("div");
-    root.id = "my-browser-utils-summary";
-    root.style.cssText = `
-    position: fixed;
-    right: 16px;
-    top: 16px;
-    width: min(480px, calc(100vw - 32px));
-    max-height: 60vh;
-    z-index: 2147483647;
-    background: #fff;
-    border: 1px solid rgba(0,0,0,0.12);
-    border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.22);
-    overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  `;
+    const els = ensureOverlay();
+    els.copyButton.disabled = !eventText;
+    els.openCalendarButton.disabled = !calendarUrl;
+    els.copyLinkButton.disabled = !calendarUrl;
+    setOverlayContent(eventText, "", "ready");
+    requestAnimationFrame(positionOverlay);
+  }
 
-    const header = document.createElement("div");
-    header.style.cssText = `
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px 12px;
-    background: #f7f7f7;
-    border-bottom: 1px solid rgba(0,0,0,0.08);
-  `;
+  function showEventOverlayError(error: string): void {
+    overlayMode = "event";
+    overlayEventText = "";
+    overlayCalendarUrl = "";
+    overlayAnchor = getSelectionAnchorRect();
+    setOverlayActionsVisibility("event");
+    setOverlayTitle("イベント要約");
 
-    const title = document.createElement("div");
-    title.textContent = "イベント要約";
-    title.style.cssText = `
-    font-size: 13px;
-    font-weight: 700;
-    color: #111;
-  `;
-
-    const actions = document.createElement("div");
-    actions.style.cssText = `
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  `;
-
-    const openButton = document.createElement("button");
-    openButton.textContent = "カレンダー";
-    openButton.style.cssText = `
-    padding: 6px 10px;
-    font-size: 12px;
-    border: none;
-    border-radius: 6px;
-    background: #4285f4;
-    color: white;
-    cursor: pointer;
-  `;
-    openButton.addEventListener("click", () => {
-      window.open(calendarUrl, "_blank", "noopener,noreferrer");
-    });
-
-    const copyEventButton = document.createElement("button");
-    copyEventButton.textContent = "コピー";
-    copyEventButton.style.cssText = `
-    padding: 6px 10px;
-    font-size: 12px;
-    border: none;
-    border-radius: 6px;
-    background: #111827;
-    color: white;
-    cursor: pointer;
-  `;
-    copyEventButton.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(eventText);
-        showNotification("コピーしました");
-      } catch {
-        showNotification("コピーに失敗しました");
-      }
-    });
-
-    const copyLinkButton = document.createElement("button");
-    copyLinkButton.textContent = "リンクコピー";
-    copyLinkButton.style.cssText = `
-    padding: 6px 10px;
-    font-size: 12px;
-    border: none;
-    border-radius: 6px;
-    background: #6b7280;
-    color: white;
-    cursor: pointer;
-  `;
-    copyLinkButton.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(calendarUrl);
-        showNotification("コピーしました");
-      } catch {
-        showNotification("コピーに失敗しました");
-      }
-    });
-
-    const closeButton = document.createElement("button");
-    closeButton.textContent = "閉じる";
-    closeButton.style.cssText = `
-    padding: 6px 10px;
-    font-size: 12px;
-    border: none;
-    border-radius: 6px;
-    background: #6b7280;
-    color: white;
-    cursor: pointer;
-  `;
-    closeButton.addEventListener("click", () => root.remove());
-
-    actions.appendChild(openButton);
-    actions.appendChild(copyEventButton);
-    actions.appendChild(copyLinkButton);
-    actions.appendChild(closeButton);
-    header.appendChild(title);
-    header.appendChild(actions);
-
-    const body = document.createElement("div");
-    body.style.cssText = `
-    padding: 12px;
-    overflow: auto;
-    max-height: calc(60vh - 44px);
-  `;
-
-    const pre = document.createElement("pre");
-    pre.textContent = eventText;
-    pre.style.cssText = `
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-size: 13px;
-    line-height: 1.45;
-    color: #111;
-  `;
-
-    body.appendChild(pre);
-    root.appendChild(header);
-    root.appendChild(body);
-    document.body.appendChild(root);
+    const els = ensureOverlay();
+    els.copyButton.disabled = true;
+    els.openCalendarButton.disabled = true;
+    els.copyLinkButton.disabled = true;
+    setOverlayContent(error || "イベント要約に失敗しました", "", "error");
+    requestAnimationFrame(positionOverlay);
   }
 
   async function maybeAutoSummarizeSelection(
@@ -647,10 +852,12 @@
     if (trimmed.length < MIN_CHARS) return;
 
     if (trimmed === lastAutoSummaryText && lastAutoSummaryResult) {
-      showSummaryOverlay(
-        lastAutoSummaryResult.summary,
-        lastAutoSummaryResult.source,
-      );
+      showSummaryOverlay({
+        action: "showSummaryOverlay",
+        status: "ready",
+        summary: lastAutoSummaryResult.summary,
+        source: lastAutoSummaryResult.source,
+      });
       return;
     }
     lastAutoSummaryText = trimmed;
@@ -690,7 +897,12 @@
           if (requestId !== autoSummaryRequestId) return;
 
           if (!response.ok) {
-            showNotification(response.error);
+            showSummaryOverlay({
+              action: "showSummaryOverlay",
+              status: "error",
+              source: "selection",
+              error: response.error,
+            });
             return;
           }
 
@@ -698,12 +910,21 @@
             summary: response.summary,
             source: response.source,
           };
-          showSummaryOverlay(response.summary, response.source);
+          showSummaryOverlay({
+            action: "showSummaryOverlay",
+            status: "ready",
+            summary: response.summary,
+            source: response.source,
+          });
         } catch (error) {
           if (requestId !== autoSummaryRequestId) return;
-          showNotification(
-            error instanceof Error ? error.message : "要約に失敗しました",
-          );
+          showSummaryOverlay({
+            action: "showSummaryOverlay",
+            status: "error",
+            source: "selection",
+            error:
+              error instanceof Error ? error.message : "要約に失敗しました",
+          });
         }
       })();
     }, 450);
