@@ -37,14 +37,27 @@
 
   type TestTokenResponse = { ok: true } | { ok: false; error: string };
 
-  document.addEventListener("DOMContentLoaded", () => {
-    void initializePopup();
-  });
+  const start = (): void => {
+    void initializePopup().catch((error) => {
+      // 初期化が途中で落ちると、ボタンが一切反応しないように見えるため通知しておく
+      console.error("Popup initialization failed:", error);
+      showNotification(
+        error instanceof Error
+          ? error.message
+          : "初期化に失敗しました（拡張機能を再読み込みしてください）",
+        "error",
+      );
+    });
+  };
+
+  // `popup.js` が遅れて読み込まれるケースでも初期化できるようにする
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
 
   async function initializePopup(): Promise<void> {
-    const settings = (await chrome.storage.sync.get([
-      "autoEnableSort",
-    ])) as SyncStorageData;
     const autoEnableCheckbox = document.getElementById(
       "auto-enable-sort",
     ) as HTMLInputElement | null;
@@ -94,21 +107,26 @@
       "summary-source-chip",
     ) as HTMLSpanElement | null;
 
+    setupNavigation();
+
     if (autoEnableCheckbox) {
-      autoEnableCheckbox.checked = settings.autoEnableSort ?? false;
       autoEnableCheckbox.addEventListener("change", (event) => {
         const target = event.target as HTMLInputElement;
-        void chrome.storage.sync.set({ autoEnableSort: target.checked });
+        void storageSyncSet({ autoEnableSort: target.checked }).catch(
+          (error) => {
+            showNotification(
+              error instanceof Error
+                ? error.message
+                : "設定の保存に失敗しました",
+              "error",
+            );
+          },
+        );
       });
     }
 
-    await loadPatterns();
-    await loadOpenAiCustomPrompt(customPromptInput);
-    await loadOpenAiToken(tokenInput);
-    setupNavigation();
-
     enableButton?.addEventListener("click", async () => {
-      const [tab] = await chrome.tabs.query({
+      const [tab] = await tabsQuery({
         active: true,
         currentWindow: true,
       });
@@ -190,7 +208,7 @@
     });
 
     summarizeButton?.addEventListener("click", async () => {
-      const [tab] = await chrome.tabs.query({
+      const [tab] = await tabsQuery({
         active: true,
         currentWindow: true,
       });
@@ -243,6 +261,54 @@
       await navigator.clipboard.writeText(text);
       showNotification("コピーしました");
     });
+
+    // 初期表示のロード（失敗しても、ボタン操作自体は動くようにしておく）
+    try {
+      const settings = (await storageSyncGet([
+        "autoEnableSort",
+      ])) as SyncStorageData;
+      if (autoEnableCheckbox) {
+        autoEnableCheckbox.checked = settings.autoEnableSort ?? false;
+      }
+    } catch (error) {
+      showNotification(
+        error instanceof Error ? error.message : "設定の読み込みに失敗しました",
+        "error",
+      );
+    }
+
+    try {
+      await loadPatterns();
+    } catch (error) {
+      showNotification(
+        error instanceof Error
+          ? error.message
+          : "ドメインパターンの読み込みに失敗しました",
+        "error",
+      );
+    }
+
+    try {
+      await loadOpenAiCustomPrompt(customPromptInput);
+    } catch (error) {
+      showNotification(
+        error instanceof Error
+          ? error.message
+          : "カスタムプロンプトの読み込みに失敗しました",
+        "error",
+      );
+    }
+
+    try {
+      await loadOpenAiToken(tokenInput);
+    } catch (error) {
+      showNotification(
+        error instanceof Error
+          ? error.message
+          : "OpenAIトークンの読み込みに失敗しました",
+        "error",
+      );
+    }
   }
 
   function showNotification(
@@ -290,8 +356,88 @@
   // ドメインパターン管理機能
   // ========================================
 
+  function storageSyncGet(keys: string[]): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      chrome.storage.sync.get(keys, (items) => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve(items);
+      });
+    });
+  }
+
+  function storageSyncSet(items: Record<string, unknown>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      chrome.storage.sync.set(items, () => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+
+  function storageLocalGet(keys: string[]): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.get(keys, (items) => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve(items);
+      });
+    });
+  }
+
+  function storageLocalSet(items: Record<string, unknown>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.set(items, () => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+
+  function storageLocalRemove(keys: string[] | string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.remove(keys, () => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+
+  function tabsQuery(
+    queryInfo: chrome.tabs.QueryInfo,
+  ): Promise<chrome.tabs.Tab[]> {
+    return new Promise((resolve, reject) => {
+      chrome.tabs.query(queryInfo, (tabs) => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve(tabs);
+      });
+    });
+  }
+
   async function loadPatterns(): Promise<void> {
-    const { domainPatterns = [] } = (await chrome.storage.sync.get([
+    const { domainPatterns = [] } = (await storageSyncGet([
       "domainPatterns",
     ])) as SyncStorageData;
     renderPatternList(domainPatterns);
@@ -343,9 +489,20 @@
       return;
     }
 
-    const { domainPatterns = [] } = (await chrome.storage.sync.get([
-      "domainPatterns",
-    ])) as SyncStorageData;
+    let domainPatterns: string[] = [];
+    try {
+      ({ domainPatterns = [] } = (await storageSyncGet([
+        "domainPatterns",
+      ])) as SyncStorageData);
+    } catch (error) {
+      showNotification(
+        error instanceof Error
+          ? error.message
+          : "パターンの読み込みに失敗しました",
+        "error",
+      );
+      return;
+    }
 
     if (domainPatterns.includes(pattern)) {
       showNotification("このパターンは既に登録されています", "error");
@@ -359,7 +516,7 @@
 
     try {
       domainPatterns.push(pattern);
-      await chrome.storage.sync.set({ domainPatterns });
+      await storageSyncSet({ domainPatterns });
 
       if (input) {
         input.value = "";
@@ -386,12 +543,21 @@
       return;
     }
 
-    const { domainPatterns = [] } = (await chrome.storage.sync.get([
-      "domainPatterns",
-    ])) as SyncStorageData;
+    let domainPatterns: string[] = [];
+    try {
+      ({ domainPatterns = [] } = (await storageSyncGet([
+        "domainPatterns",
+      ])) as SyncStorageData);
+    } catch (error) {
+      showNotification(
+        error instanceof Error ? error.message : "削除に失敗しました",
+        "error",
+      );
+      return;
+    }
 
     domainPatterns.splice(index, 1);
-    await chrome.storage.sync.set({ domainPatterns });
+    await storageSyncSet({ domainPatterns });
 
     renderPatternList(domainPatterns);
     showNotification("パターンを削除しました");
@@ -462,7 +628,7 @@
     input: HTMLInputElement | null,
   ): Promise<void> {
     if (!input) return;
-    const { openaiApiToken = "" } = (await chrome.storage.local.get([
+    const { openaiApiToken = "" } = (await storageLocalGet([
       "openaiApiToken",
     ])) as LocalStorageData;
     input.value = openaiApiToken;
@@ -477,8 +643,15 @@
       return;
     }
 
-    await chrome.storage.local.set({ openaiApiToken: token });
-    showNotification("OpenAIトークンを保存しました");
+    try {
+      await storageLocalSet({ openaiApiToken: token });
+      showNotification("OpenAIトークンを保存しました");
+    } catch (error) {
+      showNotification(
+        error instanceof Error ? error.message : "保存に失敗しました",
+        "error",
+      );
+    }
   }
 
   async function handleClearToken(
@@ -487,15 +660,22 @@
     if (input) {
       input.value = "";
     }
-    await chrome.storage.local.remove("openaiApiToken");
-    showNotification("トークンをクリアしました");
+    try {
+      await storageLocalRemove("openaiApiToken");
+      showNotification("トークンをクリアしました");
+    } catch (error) {
+      showNotification(
+        error instanceof Error ? error.message : "クリアに失敗しました",
+        "error",
+      );
+    }
   }
 
   async function loadOpenAiCustomPrompt(
     input: HTMLTextAreaElement | null,
   ): Promise<void> {
     if (!input) return;
-    const { openaiCustomPrompt = "" } = (await chrome.storage.local.get([
+    const { openaiCustomPrompt = "" } = (await storageLocalGet([
       "openaiCustomPrompt",
     ])) as LocalStorageData;
     input.value = openaiCustomPrompt;
@@ -505,15 +685,29 @@
     input: HTMLTextAreaElement | null,
   ): Promise<void> {
     const prompt = input?.value ?? "";
-    await chrome.storage.local.set({ openaiCustomPrompt: prompt });
-    showNotification("カスタムプロンプトを保存しました");
+    try {
+      await storageLocalSet({ openaiCustomPrompt: prompt });
+      showNotification("カスタムプロンプトを保存しました");
+    } catch (error) {
+      showNotification(
+        error instanceof Error ? error.message : "保存に失敗しました",
+        "error",
+      );
+    }
   }
 
   async function handleClearCustomPrompt(
     input: HTMLTextAreaElement | null,
   ): Promise<void> {
     if (input) input.value = "";
-    await chrome.storage.local.remove("openaiCustomPrompt");
-    showNotification("カスタムプロンプトをクリアしました");
+    try {
+      await storageLocalRemove("openaiCustomPrompt");
+      showNotification("カスタムプロンプトをクリアしました");
+    } catch (error) {
+      showNotification(
+        error instanceof Error ? error.message : "クリアに失敗しました",
+        "error",
+      );
+    }
   }
 })();

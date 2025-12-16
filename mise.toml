@@ -21,7 +21,7 @@ node = "22"
 
 [tasks.format]
 description = "Prettierでソース全体を整形"
-run = "prettier --write \"src/**/*.{ts,js}\" popup.html manifest.json popup.css content.css README.md"
+run = "prettier --write \"src/**/*.{ts,js}\" popup.html popup_bootstrap.js manifest.json popup.css content.css README.md"
 
 [tasks."lint:types"]
 description = "TypeScriptの型チェックのみ"
@@ -29,7 +29,7 @@ run = "pnpm exec tsc --noEmit"
 
 [tasks."lint:prettier"]
 description = "Prettierのチェックのみ"
-run = "prettier --check \"src/**/*.{ts,js}\" popup.html manifest.json popup.css content.css README.md"
+run = "prettier --check \"src/**/*.{ts,js}\" popup.html popup_bootstrap.js manifest.json popup.css content.css README.md"
 
 [tasks.lint]
 description = "型チェックとフォーマット検証を実行"

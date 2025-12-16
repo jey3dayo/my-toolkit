@@ -244,11 +244,10 @@ function sendMessageToTab<TRequest, TResponse>(
 async function summarizeWithOpenAI(
   target: SummaryTarget,
 ): Promise<BackgroundResponse> {
-  const { openaiApiToken, openaiCustomPrompt } =
-    (await chrome.storage.local.get([
-      "openaiApiToken",
-      "openaiCustomPrompt",
-    ])) as LocalStorageData;
+  const { openaiApiToken, openaiCustomPrompt } = (await storageLocalGet([
+    "openaiApiToken",
+    "openaiCustomPrompt",
+  ])) as LocalStorageData;
 
   if (!openaiApiToken) {
     return {
@@ -350,7 +349,7 @@ function extractChatCompletionText(json: unknown): string | null {
 async function testOpenAiToken(
   tokenOverride?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { openaiApiToken } = (await chrome.storage.local.get([
+  const { openaiApiToken } = (await storageLocalGet([
     "openaiApiToken",
   ])) as LocalStorageData;
 
@@ -410,11 +409,10 @@ type ExtractedEvent = {
 async function extractEventWithOpenAI(
   target: SummaryTarget,
 ): Promise<{ ok: true; event: ExtractedEvent } | { ok: false; error: string }> {
-  const { openaiApiToken, openaiCustomPrompt } =
-    (await chrome.storage.local.get([
-      "openaiApiToken",
-      "openaiCustomPrompt",
-    ])) as LocalStorageData;
+  const { openaiApiToken, openaiCustomPrompt } = (await storageLocalGet([
+    "openaiApiToken",
+    "openaiCustomPrompt",
+  ])) as LocalStorageData;
 
   if (!openaiApiToken) {
     return {
@@ -523,6 +521,19 @@ function safeParseJsonObject<T>(text: string): T | null {
       return null;
     }
   }
+}
+
+function storageLocalGet(keys: string[]): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(keys, (items) => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        reject(new Error(err.message));
+        return;
+      }
+      resolve(items);
+    });
+  });
 }
 
 function normalizeEvent(event: ExtractedEvent): ExtractedEvent {

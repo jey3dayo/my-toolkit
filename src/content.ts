@@ -241,7 +241,7 @@
   document.addEventListener("mouseup", (event) => {
     const selectedText = window.getSelection()?.toString().trim() ?? "";
     if (selectedText) {
-      void chrome.storage.local.set({
+      void storageLocalSet({
         selectedText,
         selectedTextUpdatedAt: Date.now(),
       });
@@ -313,7 +313,7 @@
       };
     }
 
-    const storedSelection = (await chrome.storage.local.get([
+    const storedSelection = (await storageLocalGet([
       "selectedText",
       "selectedTextUpdatedAt",
     ])) as {
@@ -952,7 +952,10 @@
   (async function autoEnableTableSort(): Promise<void> {
     try {
       const { domainPatterns = [], autoEnableSort = false }: StorageData =
-        await chrome.storage.sync.get(["domainPatterns", "autoEnableSort"]);
+        (await storageSyncGet([
+          "domainPatterns",
+          "autoEnableSort",
+        ])) as StorageData;
 
       if (autoEnableSort) {
         enableTableSort();
@@ -968,4 +971,43 @@
       console.error("Auto-enable table sort failed:", error);
     }
   })();
+
+  function storageSyncGet(keys: string[]): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      chrome.storage.sync.get(keys, (items) => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve(items);
+      });
+    });
+  }
+
+  function storageLocalGet(keys: string[]): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.get(keys, (items) => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve(items);
+      });
+    });
+  }
+
+  function storageLocalSet(items: Record<string, unknown>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.set(items, () => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve();
+      });
+    });
+  }
 })();
