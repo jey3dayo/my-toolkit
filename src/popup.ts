@@ -568,7 +568,11 @@
 
     if (/\s/.test(pattern)) return false;
 
-    if (!/^[a-zA-Z0-9.*\\-_/:]+$/.test(pattern)) return false;
+    // URLっぽい文字（? # & = % など）も許可して、コピペしたURLをそのまま登録できるようにする
+    // RFC3986 の予約文字 + % + ワイルドカード(*) を許可
+    if (!/^[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%*-]+$/.test(pattern)) {
+      return false;
+    }
 
     return true;
   }

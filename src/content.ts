@@ -73,12 +73,24 @@
       .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
       .replace(/\*/g, ".*");
 
-    return new RegExp(`^${escaped}$`);
+    const shouldAllowQueryHashSuffix = !/[?#]/.test(pattern);
+    const allowOptionalTrailingSlash =
+      shouldAllowQueryHashSuffix &&
+      !pattern.endsWith("/") &&
+      !pattern.includes("*");
+
+    const optionalTrailingSlash = allowOptionalTrailingSlash ? "(?:/)?" : "";
+    const optionalQueryHashSuffix = shouldAllowQueryHashSuffix
+      ? "(?:[?#].*)?"
+      : "";
+
+    return new RegExp(
+      `^${escaped}${optionalTrailingSlash}${optionalQueryHashSuffix}$`,
+    );
   }
 
   function matchesAnyPattern(patterns: string[]): boolean {
-    const url = window.location.href;
-    const urlWithoutProtocol = url.replace(/^https?:\/\//, "");
+    const urlWithoutProtocol = window.location.href.replace(/^https?:\/\//, "");
 
     return patterns.some((pattern) => {
       const patternWithoutProtocol = pattern.replace(/^https?:\/\//, "");
