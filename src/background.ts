@@ -1,5 +1,14 @@
 // Background Service Worker
 
+import { addHours } from 'date-fns';
+import {
+  formatLocalYyyyMmDdFromDate,
+  formatUtcDateTimeFromDate,
+  nextDateYyyyMmDd,
+  parseDateOnlyToYyyyMmDd,
+  parseDateTimeLoose,
+} from './date_utils';
+
 type SummarySource = 'selection' | 'page';
 
 type SummaryTarget = {
@@ -941,18 +950,19 @@ function buildGoogleCalendarUrl(event: ExtractedEvent): string | null {
       endDate = nextDateYyyyMmDd(startDate);
     }
     dates = `${startDate}/${endDate}`;
-  } else {
-    const startDate = parseDateTimeLoose(startRaw);
-    if (!startDate) return null;
-    let endDate = endRaw ? parseDateTimeLoose(endRaw) : null;
-    if (!endDate || endDate.getTime() <= startDate.getTime()) {
-      endDate = addHours(startDate, 1);
-    }
-    const startUtc = formatUtcDateTimeFromDate(startDate);
-    const endUtc = formatUtcDateTimeFromDate(endDate);
-    if (!startUtc || !endUtc) return null;
-    dates = `${startUtc}/${endUtc}`;
-  }
+	  } else {
+	    const startDate = parseDateTimeLoose(startRaw);
+	    if (!startDate) return null;
+	    let endDate = endRaw ? parseDateTimeLoose(endRaw) : null;
+	    if (!endDate || endDate.getTime() <= startDate.getTime()) {
+	      endDate = addHours(startDate, 1);
+	    }
+	    const startUtc = formatUtcDateTimeFromDate(startDate);
+	    if (!endDate) return null;
+	    const endUtc = formatUtcDateTimeFromDate(endDate);
+	    if (!startUtc || !endUtc) return null;
+	    dates = `${startUtc}/${endUtc}`;
+	  }
 
   const params = new URLSearchParams({
     action: 'TEMPLATE',

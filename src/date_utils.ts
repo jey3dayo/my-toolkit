@@ -23,9 +23,13 @@ export function parseDateOnlyToYyyyMmDd(value: string): string | null {
   const raw = value.trim();
   if (!raw) return null;
 
-  const parsed =
-    parseWithFormats(raw, ['yyyy-M-d', 'yyyy/M/d', 'yyyy年M月d日']) ??
-    parseWithFormats(raw, ['yyyy-MM-dd', 'yyyy/MM/dd']);
+  const parsed = parseWithFormats(raw, [
+    'yyyy-M-d',
+    'yyyy-MM-dd',
+    'yyyy/M/d',
+    'yyyy/MM/dd',
+    'yyyy年M月d日',
+  ]);
   if (!parsed) return null;
 
   return format(parsed, 'yyyyMMdd');
@@ -34,6 +38,10 @@ export function parseDateOnlyToYyyyMmDd(value: string): string | null {
 export function parseDateTimeLoose(value: string): Date | null {
   const normalized = normalizeDateTimeInput(value);
   if (!normalized) return null;
+
+  if (!/\d{1,2}:\d{2}/.test(normalized)) {
+    return null;
+  }
 
   const isoCandidate = normalized.includes('T') ? normalized : normalized.replace(' ', 'T');
   const parsedIso = parseISO(isoCandidate);
@@ -86,8 +94,9 @@ export function formatLocalYyyyMmDdFromDate(date: Date): string | null {
 export function nextDateYyyyMmDd(yyyymmdd: string): string {
   const raw = yyyymmdd.trim();
   if (!/^\d{8}$/.test(raw)) return raw;
+
   const parsed = parse(raw, 'yyyyMMdd', new Date());
   if (!isValid(parsed)) return raw;
+
   return format(addDays(parsed, 1), 'yyyyMMdd');
 }
-

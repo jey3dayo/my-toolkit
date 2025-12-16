@@ -897,15 +897,16 @@ import {
 	      }
 	      dtStartLine = `DTSTART;VALUE=DATE:${startDate}`;
 	      dtEndLine = `DTEND;VALUE=DATE:${endDate}`;
-		    } else {
-		      const startDate = parseDateTimeLoose(startRaw);
-		      if (!startDate) return null;
-		      const startUtc = toUtcDateTimeFromDate(startDate);
-		      if (!startUtc) return null;
-		      let endDate = endRaw ? parseDateTimeLoose(endRaw) : null;
+			    } else {
+			      const startDate = parseDateTimeLoose(startRaw);
+			      if (!startDate) return null;
+			      const startUtc = toUtcDateTimeFromDate(startDate);
+			      if (!startUtc) return null;
+			      let endDate = endRaw ? parseDateTimeLoose(endRaw) : null;
 			      if (!endDate || endDate.getTime() <= startDate.getTime()) {
 			        endDate = addHours(startDate, 1);
 			      }
+			      if (!endDate) return null;
 			      const endUtc = toUtcDateTimeFromDate(endDate);
 			      if (!endUtc) return null;
 			      dtStartLine = `DTSTART:${startUtc}`;

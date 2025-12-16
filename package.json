@@ -7,8 +7,10 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc --watch",
+    "build": "pnpm run clean && pnpm run typecheck && pnpm run bundle",
+    "bundle": "esbuild src/background.ts src/content.ts src/popup.ts --bundle --format=iife --platform=browser --target=es2020 --outdir=dist --sourcemap",
+    "typecheck": "tsc --noEmit",
+    "watch": "pnpm run bundle --watch",
     "clean": "rm -rf dist",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -21,6 +23,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "date-fns": "^4.1.0"
+  },
   "devDependencies": {
     "@eslint/compat": "^2.0.0",
     "@eslint/eslintrc": "^3.3.3",
@@ -39,6 +44,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-storybook": "10.1.7",
+    "esbuild": "^0.25.10",
     "jsdom": "^27.3.0",
     "prettier": "^3.7.4",
     "typescript-eslint": "^8.50.0",
