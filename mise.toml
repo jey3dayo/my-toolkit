@@ -37,7 +37,11 @@ run = "pnpm run test"
 
 [tasks.lint]
 description = "型チェックとフォーマット検証を実行"
-depends = ["lint:types", "lint:prettier"]
+depends = ["lint:types", "lint:prettier", "lint:eslint"]
+
+[tasks."lint:eslint"]
+description = "ESLintのチェックのみ"
+run = "pnpm run lint:eslint"
 
 [tasks.build]
 description = "TypeScriptをビルド"

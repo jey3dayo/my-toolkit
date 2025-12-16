@@ -14,18 +14,26 @@
     "test:watch": "vitest",
     "prettier": "prettier --write --cache --log-level warn --ignore-path .prettierignore './*.{js,ts,jsx,tsx,css,html,json,md}' './{docs,src,tests}/**/*.{js,ts,jsx,tsx,css,html,json,md}'",
     "prettier:check": "prettier --check --cache --ignore-path .prettierignore './*.{js,ts,jsx,tsx,css,html,json,md}' './{docs,src,tests}/**/*.{js,ts,jsx,tsx,css,html,json,md}'",
-    "format": "pnpm run prettier"
+    "format": "pnpm run prettier",
+    "lint:eslint": "eslint .",
+    "lint:eslint:fix": "eslint . --fix"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@eslint/compat": "^2.0.0",
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^9.17.0",
     "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
     "@types/chrome": "^0.1.32",
     "@types/jsdom": "^27.0.0",
+    "eslint": "^9.17.0",
     "eslint-config-prettier": "^10.1.8",
+    "globals": "^15.14.0",
     "jsdom": "^27.0.0",
     "prettier": "^3.7.4",
+    "typescript-eslint": "^8.18.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },
