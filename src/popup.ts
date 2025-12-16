@@ -952,10 +952,45 @@ import {
     const panes = Array.from(document.querySelectorAll<HTMLElement>('.pane'));
     const heroChip = document.getElementById('hero-chip') as HTMLSpanElement | null;
     const ctaPill = document.getElementById('cta-pill') as HTMLButtonElement | null;
+    const sidebarToggle = document.getElementById('sidebar-toggle') as HTMLButtonElement | null;
 
     if (ctaPill && !isExtensionPage) {
       ctaPill.disabled = true;
     }
+
+    const sidebarCollapsedKey = `${fallbackStoragePrefix}sidebarCollapsed`;
+
+    const readSidebarCollapsed = (): boolean => {
+      try {
+        return localStorage.getItem(sidebarCollapsedKey) === '1';
+      } catch {
+        return false;
+      }
+    };
+
+    const writeSidebarCollapsed = (collapsed: boolean): void => {
+      try {
+        localStorage.setItem(sidebarCollapsedKey, collapsed ? '1' : '0');
+      } catch {
+        // ignore
+      }
+    };
+
+    const applySidebarCollapsed = (collapsed: boolean): void => {
+      document.body.classList.toggle('sidebar-collapsed', collapsed);
+      if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+        sidebarToggle.title = collapsed ? 'メニューを開く' : 'メニューを折りたたむ';
+      }
+    };
+
+    applySidebarCollapsed(readSidebarCollapsed());
+
+    sidebarToggle?.addEventListener('click', () => {
+      const nextCollapsed = !document.body.classList.contains('sidebar-collapsed');
+      applySidebarCollapsed(nextCollapsed);
+      writeSidebarCollapsed(nextCollapsed);
+    });
 
     const updateHero = (activeTargetId?: string): void => {
       if (!heroChip || !ctaPill) return;
