@@ -1,7 +1,6 @@
 import js from '@eslint/js';
 import prettierConfig from 'eslint-config-prettier';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
-import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default [
@@ -12,7 +11,12 @@ export default [
     files: ['prettier.config.js', '*.config.{js,cjs,mjs}', 'eslint.config.mjs'],
     languageOptions: {
       globals: {
-        ...globals.node,
+        module: 'writable',
+        require: 'readonly',
+        process: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        exports: 'writable',
       },
     },
   },
@@ -26,8 +30,17 @@ export default [
     },
     languageOptions: {
       globals: {
-        ...globals.browser,
         chrome: 'readonly',
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        location: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
       },
     },
     rules: {
