@@ -39,13 +39,15 @@
             <div class="title-text">
               <p class="eyebrow">MY BROWSER UTILS</p>
               <div class="title-row">
-                <h1>毎日の表を整える相棒</h1>
-                <span class="chip chip-outline">テーブルソート</span>
+                <h1>ブラウザ作業を整える相棒</h1>
+                <span class="chip chip-outline" id="hero-chip"
+                  >テーブルソート</span
+                >
               </div>
               <p class="subtitle">ブラウザ作業を少しラクにするツールセット</p>
             </div>
           </div>
-          <div class="cta-pill">ワンクリックで整列</div>
+          <div class="cta-pill" id="cta-pill">ワンクリックで整列</div>
         </header>
 
         <section
@@ -189,7 +191,7 @@
           <div class="pane-intro">
             <div>
               <p class="pane-eyebrow">設定</p>
-              <h2>OpenAI API Token</h2>
+              <h2>AI設定</h2>
               <p class="muted">
                 今後のAI連携機能で使用するトークンを保存します。
               </p>
@@ -200,6 +202,35 @@
                 ブラウザのローカルストレージに平文で保存します。必要に応じてクリアしてください。
               </p>
             </div>
+          </div>
+
+          <div class="card secondary">
+            <div class="card-header">
+              <div>
+                <p class="card-eyebrow">プロンプト</p>
+                <h3>要約の口調・特徴をカスタム</h3>
+              </div>
+              <span class="chip chip-soft">任意</span>
+            </div>
+            <label class="field-label" for="openai-custom-prompt"
+              >カスタムプロンプト</label
+            >
+            <textarea
+              id="openai-custom-prompt"
+              class="prompt-input"
+              placeholder="例: です/ます調。箇条書きは短く。技術用語は補足を付けて。"
+            ></textarea>
+            <div class="token-row token-row-actions">
+              <button id="save-openai-custom-prompt" class="btn btn-primary">
+                保存
+              </button>
+              <button id="clear-openai-custom-prompt" class="btn btn-ghost">
+                クリア
+              </button>
+            </div>
+            <p class="hint">
+              ここに書いた指示は要約の出力スタイルに反映されます（事実改変の指示は避けてください）。
+            </p>
           </div>
 
           <div class="card">
@@ -214,7 +245,7 @@
             <label class="field-label" for="openai-token"
               >OpenAI API Token</label
             >
-            <div class="token-row">
+            <div class="token-row token-row-main">
               <input
                 type="password"
                 id="openai-token"
@@ -222,8 +253,20 @@
                 class="token-input"
                 autocomplete="off"
               />
+              <button
+                id="toggle-openai-token-visibility"
+                class="btn btn-ghost"
+                aria-label="トークンの表示切り替え"
+              >
+                表示
+              </button>
+            </div>
+            <div class="token-row token-row-actions">
               <button id="save-openai-token" class="btn btn-primary">
                 保存
+              </button>
+              <button id="test-openai-token" class="btn btn-ghost">
+                動作確認
               </button>
               <button id="clear-openai-token" class="btn btn-ghost">
                 クリア

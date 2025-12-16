@@ -437,6 +437,32 @@ body {
   margin: 8px 0 6px;
 }
 
+.token-row-main {
+  flex-wrap: nowrap;
+}
+
+.token-row-actions {
+  margin-top: 10px;
+}
+
+.prompt-input {
+  width: 100%;
+  min-height: 110px;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+  color: var(--text);
+  resize: vertical;
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.prompt-input::placeholder {
+  color: #7d86a2;
+}
+
 .summary-output {
   width: 100%;
   min-height: 160px;

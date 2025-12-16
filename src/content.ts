@@ -21,7 +21,24 @@
     url: string;
   };
 
+  type ContentToBackgroundMessage =
+    | { action: "summarizeText"; target: SummaryTarget }
+    | { action: "summarizeEvent"; target: SummaryTarget };
+
+  type SummarizeTextResponse =
+    | { ok: true; summary: string; source: SummarySource }
+    | { ok: false; error: string };
+
+  type SummarizeEventResponse =
+    | { ok: true; event: unknown; calendarUrl: string; eventText: string }
+    | { ok: false; error: string };
+
   let tableObserver: MutationObserver | null = null;
+  let autoSummaryTimer: number | null = null;
+  let autoSummaryRequestId = 0;
+  let lastAutoSummaryText = "";
+  let lastAutoSummaryResult: { summary: string; source: SummarySource } | null =
+    null;
 
   // ========================================
   // 1. ユーティリティ関数
@@ -197,14 +214,16 @@
   // 5. UI・通知関連
   // ========================================
 
-  document.addEventListener("mouseup", () => {
-    const selectedText = window.getSelection()?.toString().trim();
+  document.addEventListener("mouseup", (event) => {
+    const selectedText = window.getSelection()?.toString().trim() ?? "";
     if (selectedText) {
       void chrome.storage.local.set({
         selectedText,
         selectedTextUpdatedAt: Date.now(),
       });
     }
+
+    void maybeAutoSummarizeSelection(selectedText, event);
   });
 
   function showNotification(message: string): void {
@@ -315,9 +334,9 @@
     root.style.cssText = `
     position: fixed;
     right: 16px;
-    bottom: 16px;
-    width: min(520px, calc(100vw - 32px));
-    max-height: 70vh;
+    top: 16px;
+    width: min(480px, calc(100vw - 32px));
+    max-height: 60vh;
     z-index: 2147483647;
     background: #fff;
     border: 1px solid rgba(0,0,0,0.12);
@@ -374,6 +393,57 @@
       }
     });
 
+    const eventButton = document.createElement("button");
+    eventButton.textContent = "イベント";
+    eventButton.style.cssText = `
+    padding: 6px 10px;
+    font-size: 12px;
+    border: none;
+    border-radius: 6px;
+    background: #111827;
+    color: white;
+    cursor: pointer;
+  `;
+    eventButton.addEventListener("click", () => {
+      void (async () => {
+        if (eventButton) eventButton.disabled = true;
+        const prevText = eventButton.textContent;
+        eventButton.textContent = "処理中...";
+
+        try {
+          const target = await getSummaryTargetText();
+          if (target.source !== "selection") {
+            showNotification("選択範囲が見つかりませんでした");
+            return;
+          }
+
+          const response = await sendMessageToBackground<
+            ContentToBackgroundMessage,
+            SummarizeEventResponse
+          >({
+            action: "summarizeEvent",
+            target,
+          });
+
+          if (!response.ok) {
+            showNotification(response.error);
+            return;
+          }
+
+          showEventOverlay(response.eventText, response.calendarUrl);
+        } catch (error) {
+          showNotification(
+            error instanceof Error
+              ? error.message
+              : "イベント要約に失敗しました",
+          );
+        } finally {
+          eventButton.textContent = prevText ?? "イベント";
+          eventButton.disabled = false;
+        }
+      })();
+    });
+
     const closeButton = document.createElement("button");
     closeButton.textContent = "閉じる";
     closeButton.style.cssText = `
@@ -388,6 +458,9 @@
     closeButton.addEventListener("click", () => root.remove());
 
     actions.appendChild(copyButton);
+    if (source === "selection") {
+      actions.appendChild(eventButton);
+    }
     actions.appendChild(closeButton);
     header.appendChild(title);
     header.appendChild(actions);
@@ -396,7 +469,7 @@
     body.style.cssText = `
     padding: 12px;
     overflow: auto;
-    max-height: calc(70vh - 44px);
+    max-height: calc(60vh - 44px);
   `;
 
     const pre = document.createElement("pre");
@@ -414,6 +487,241 @@
     root.appendChild(header);
     root.appendChild(body);
     document.body.appendChild(root);
+  }
+
+  function showEventOverlay(eventText: string, calendarUrl: string): void {
+    const existing = document.getElementById("my-browser-utils-summary");
+    if (existing) existing.remove();
+
+    const root = document.createElement("div");
+    root.id = "my-browser-utils-summary";
+    root.style.cssText = `
+    position: fixed;
+    right: 16px;
+    top: 16px;
+    width: min(480px, calc(100vw - 32px));
+    max-height: 60vh;
+    z-index: 2147483647;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  `;
+
+    const header = document.createElement("div");
+    header.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #f7f7f7;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  `;
+
+    const title = document.createElement("div");
+    title.textContent = "イベント要約";
+    title.style.cssText = `
+    font-size: 13px;
+    font-weight: 700;
+    color: #111;
+  `;
+
+    const actions = document.createElement("div");
+    actions.style.cssText = `
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  `;
+
+    const openButton = document.createElement("button");
+    openButton.textContent = "カレンダー";
+    openButton.style.cssText = `
+    padding: 6px 10px;
+    font-size: 12px;
+    border: none;
+    border-radius: 6px;
+    background: #4285f4;
+    color: white;
+    cursor: pointer;
+  `;
+    openButton.addEventListener("click", () => {
+      window.open(calendarUrl, "_blank", "noopener,noreferrer");
+    });
+
+    const copyEventButton = document.createElement("button");
+    copyEventButton.textContent = "コピー";
+    copyEventButton.style.cssText = `
+    padding: 6px 10px;
+    font-size: 12px;
+    border: none;
+    border-radius: 6px;
+    background: #111827;
+    color: white;
+    cursor: pointer;
+  `;
+    copyEventButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(eventText);
+        showNotification("コピーしました");
+      } catch {
+        showNotification("コピーに失敗しました");
+      }
+    });
+
+    const copyLinkButton = document.createElement("button");
+    copyLinkButton.textContent = "リンクコピー";
+    copyLinkButton.style.cssText = `
+    padding: 6px 10px;
+    font-size: 12px;
+    border: none;
+    border-radius: 6px;
+    background: #6b7280;
+    color: white;
+    cursor: pointer;
+  `;
+    copyLinkButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(calendarUrl);
+        showNotification("コピーしました");
+      } catch {
+        showNotification("コピーに失敗しました");
+      }
+    });
+
+    const closeButton = document.createElement("button");
+    closeButton.textContent = "閉じる";
+    closeButton.style.cssText = `
+    padding: 6px 10px;
+    font-size: 12px;
+    border: none;
+    border-radius: 6px;
+    background: #6b7280;
+    color: white;
+    cursor: pointer;
+  `;
+    closeButton.addEventListener("click", () => root.remove());
+
+    actions.appendChild(openButton);
+    actions.appendChild(copyEventButton);
+    actions.appendChild(copyLinkButton);
+    actions.appendChild(closeButton);
+    header.appendChild(title);
+    header.appendChild(actions);
+
+    const body = document.createElement("div");
+    body.style.cssText = `
+    padding: 12px;
+    overflow: auto;
+    max-height: calc(60vh - 44px);
+  `;
+
+    const pre = document.createElement("pre");
+    pre.textContent = eventText;
+    pre.style.cssText = `
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #111;
+  `;
+
+    body.appendChild(pre);
+    root.appendChild(header);
+    root.appendChild(body);
+    document.body.appendChild(root);
+  }
+
+  async function maybeAutoSummarizeSelection(
+    selectedText: string,
+    event: MouseEvent,
+  ): Promise<void> {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("#my-browser-utils-summary")) return;
+
+    const MIN_CHARS = 1;
+    const trimmed = selectedText.trim();
+    if (trimmed.length < MIN_CHARS) return;
+
+    if (trimmed === lastAutoSummaryText && lastAutoSummaryResult) {
+      showSummaryOverlay(
+        lastAutoSummaryResult.summary,
+        lastAutoSummaryResult.source,
+      );
+      return;
+    }
+    lastAutoSummaryText = trimmed;
+    lastAutoSummaryResult = null;
+
+    if (autoSummaryTimer) {
+      window.clearTimeout(autoSummaryTimer);
+      autoSummaryTimer = null;
+    }
+
+    const requestId = ++autoSummaryRequestId;
+    autoSummaryTimer = window.setTimeout(() => {
+      void (async () => {
+        const currentSelection = window.getSelection()?.toString().trim() ?? "";
+        if (currentSelection && currentSelection !== trimmed) {
+          return;
+        }
+
+        showNotification("要約中...");
+
+        const summaryTarget: SummaryTarget = {
+          text: trimmed,
+          source: "selection",
+          title: document.title ?? "",
+          url: window.location.href,
+        };
+
+        try {
+          const response = await sendMessageToBackground<
+            ContentToBackgroundMessage,
+            SummarizeTextResponse
+          >({
+            action: "summarizeText",
+            target: summaryTarget,
+          });
+
+          if (requestId !== autoSummaryRequestId) return;
+
+          if (!response.ok) {
+            showNotification(response.error);
+            return;
+          }
+
+          lastAutoSummaryResult = {
+            summary: response.summary,
+            source: response.source,
+          };
+          showSummaryOverlay(response.summary, response.source);
+        } catch (error) {
+          if (requestId !== autoSummaryRequestId) return;
+          showNotification(
+            error instanceof Error ? error.message : "要約に失敗しました",
+          );
+        }
+      })();
+    }, 450);
+  }
+
+  function sendMessageToBackground<TRequest, TResponse>(
+    message: TRequest,
+  ): Promise<TResponse> {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(message, (response: TResponse) => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new Error(err.message));
+          return;
+        }
+        resolve(response);
+      });
+    });
   }
 
   // ========================================

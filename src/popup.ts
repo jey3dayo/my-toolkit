@@ -6,6 +6,7 @@
 
   type LocalStorageData = {
     openaiApiToken?: string;
+    openaiCustomPrompt?: string;
   };
 
   type EnableResponse = {
@@ -25,9 +26,16 @@
     tabId: number;
   };
 
+  type PopupToBackgroundTestTokenMessage = {
+    action: "testOpenAiToken";
+    token?: string;
+  };
+
   type SummarizeResponse =
     | { ok: true; summary: string; source: SummarySource }
     | { ok: false; error: string };
+
+  type TestTokenResponse = { ok: true } | { ok: false; error: string };
 
   document.addEventListener("DOMContentLoaded", () => {
     void initializePopup();
@@ -58,6 +66,21 @@
     const clearTokenButton = document.getElementById(
       "clear-openai-token",
     ) as HTMLButtonElement | null;
+    const toggleTokenVisibilityButton = document.getElementById(
+      "toggle-openai-token-visibility",
+    ) as HTMLButtonElement | null;
+    const testTokenButton = document.getElementById(
+      "test-openai-token",
+    ) as HTMLButtonElement | null;
+    const customPromptInput = document.getElementById(
+      "openai-custom-prompt",
+    ) as HTMLTextAreaElement | null;
+    const saveCustomPromptButton = document.getElementById(
+      "save-openai-custom-prompt",
+    ) as HTMLButtonElement | null;
+    const clearCustomPromptButton = document.getElementById(
+      "clear-openai-custom-prompt",
+    ) as HTMLButtonElement | null;
     const summarizeButton = document.getElementById(
       "summarize-tab",
     ) as HTMLButtonElement | null;
@@ -80,6 +103,7 @@
     }
 
     await loadPatterns();
+    await loadOpenAiCustomPrompt(customPromptInput);
     await loadOpenAiToken(tokenInput);
     setupNavigation();
 
@@ -118,6 +142,51 @@
 
     clearTokenButton?.addEventListener("click", () => {
       void handleClearToken(tokenInput);
+    });
+
+    toggleTokenVisibilityButton?.addEventListener("click", () => {
+      if (!tokenInput) return;
+      const nextType = tokenInput.type === "password" ? "text" : "password";
+      tokenInput.type = nextType;
+      toggleTokenVisibilityButton.textContent =
+        nextType === "text" ? "非表示" : "表示";
+    });
+
+    testTokenButton?.addEventListener("click", async () => {
+      if (testTokenButton) testTokenButton.disabled = true;
+      showNotification("OpenAI API Tokenを確認中...");
+      try {
+        const token = tokenInput?.value.trim() ?? "";
+        const response = await sendMessageToBackground<
+          PopupToBackgroundTestTokenMessage,
+          TestTokenResponse
+        >({
+          action: "testOpenAiToken",
+          token: token || undefined,
+        });
+
+        if (!response.ok) {
+          showNotification(response.error, "error");
+          return;
+        }
+
+        showNotification("OK: トークンは有効です");
+      } catch (error) {
+        showNotification(
+          error instanceof Error ? error.message : "トークン確認に失敗しました",
+          "error",
+        );
+      } finally {
+        if (testTokenButton) testTokenButton.disabled = false;
+      }
+    });
+
+    saveCustomPromptButton?.addEventListener("click", () => {
+      void handleSaveCustomPrompt(customPromptInput);
+    });
+
+    clearCustomPromptButton?.addEventListener("click", () => {
+      void handleClearCustomPrompt(customPromptInput);
     });
 
     summarizeButton?.addEventListener("click", async () => {
@@ -349,6 +418,25 @@
       document.querySelectorAll<HTMLButtonElement>(".nav-item"),
     );
     const panes = Array.from(document.querySelectorAll<HTMLElement>(".pane"));
+    const heroChip = document.getElementById("hero-chip") as HTMLSpanElement;
+    const ctaPill = document.getElementById("cta-pill") as HTMLDivElement;
+
+    const updateHero = (activeTargetId?: string): void => {
+      if (!heroChip || !ctaPill) return;
+      if (activeTargetId === "pane-summary") {
+        heroChip.textContent = "AI要約";
+        ctaPill.textContent = "すぐ要約";
+        return;
+      }
+      if (activeTargetId === "pane-settings") {
+        heroChip.textContent = "設定";
+        ctaPill.textContent = "好みに調整";
+        return;
+      }
+
+      heroChip.textContent = "テーブルソート";
+      ctaPill.textContent = "ワンクリックで整列";
+    };
 
     navItems.forEach((item) => {
       item.addEventListener("click", () => {
@@ -360,8 +448,14 @@
         if (targetId) {
           document.getElementById(targetId)?.classList.add("active");
         }
+        updateHero(targetId);
       });
     });
+
+    const defaultActive = navItems.find((item) =>
+      item.classList.contains("active"),
+    )?.dataset.target;
+    updateHero(defaultActive);
   }
 
   async function loadOpenAiToken(
@@ -395,5 +489,31 @@
     }
     await chrome.storage.local.remove("openaiApiToken");
     showNotification("トークンをクリアしました");
+  }
+
+  async function loadOpenAiCustomPrompt(
+    input: HTMLTextAreaElement | null,
+  ): Promise<void> {
+    if (!input) return;
+    const { openaiCustomPrompt = "" } = (await chrome.storage.local.get([
+      "openaiCustomPrompt",
+    ])) as LocalStorageData;
+    input.value = openaiCustomPrompt;
+  }
+
+  async function handleSaveCustomPrompt(
+    input: HTMLTextAreaElement | null,
+  ): Promise<void> {
+    const prompt = input?.value ?? "";
+    await chrome.storage.local.set({ openaiCustomPrompt: prompt });
+    showNotification("カスタムプロンプトを保存しました");
+  }
+
+  async function handleClearCustomPrompt(
+    input: HTMLTextAreaElement | null,
+  ): Promise<void> {
+    if (input) input.value = "";
+    await chrome.storage.local.remove("openaiCustomPrompt");
+    showNotification("カスタムプロンプトをクリアしました");
   }
 })();
