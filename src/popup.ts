@@ -6,6 +6,8 @@ import {
   parseDateOnlyToYyyyMmDd,
   parseDateTimeLoose,
 } from './date_utils';
+import { setupPopupNavigation } from './popup/navigation';
+import { ensureOpenAiTokenConfigured } from './popup/token_guard';
 
 (() => {
   type SyncStorageData = {
@@ -160,7 +162,24 @@ import {
     let lastCalendarUrl: string | null = null;
     let lastEvent: ExtractedEvent | null = null;
 
-    setupNavigation();
+    setupPopupNavigation({ isExtensionPage, storagePrefix: fallbackStoragePrefix, document, window });
+
+    const navigateToPane = (targetId: string): void => {
+      const selector = `.nav-item[data-target="${CSS.escape(targetId)}"]`;
+      const navItem = document.querySelector<HTMLElement>(selector);
+      if (navItem) {
+        navItem.click();
+        return;
+      }
+      window.location.hash = `#${targetId}`;
+    };
+
+    const focusTokenInput = (): void => {
+      window.setTimeout(() => {
+        const tokenInput = document.getElementById('openai-token') as HTMLInputElement | null;
+        tokenInput?.focus();
+      }, 0);
+    };
 
     if (autoEnableCheckbox) {
       autoEnableCheckbox.addEventListener('change', event => {
@@ -377,6 +396,17 @@ import {
       const action = contextActions.find(item => item.id === actionId);
       if (!action) {
         showNotification('アクションが見つかりません', 'error');
+        return;
+      }
+
+      if (
+        !(await ensureOpenAiTokenConfigured({
+          storageLocalGet,
+          showNotification,
+          navigateToPane,
+          focusTokenInput,
+        }))
+      ) {
         return;
       }
 
@@ -939,133 +969,6 @@ import {
     ].filter(Boolean);
 
     return lines.map(foldLine).join('\r\n') + '\r\n';
-  }
-
-  function setupNavigation(): void {
-    // 拡張機能ページではJSでタブ切り替え（.active）を制御できるので、
-    // CSSの `:target` フォールバック（no-js）を無効化する。
-    if (isExtensionPage) {
-      document.body.classList.remove('no-js');
-    }
-
-    const navItems = Array.from(document.querySelectorAll<HTMLElement>('.nav-item'));
-    const panes = Array.from(document.querySelectorAll<HTMLElement>('.pane'));
-    const heroChip = document.getElementById('hero-chip') as HTMLSpanElement | null;
-    const ctaPill = document.getElementById('cta-pill') as HTMLButtonElement | null;
-    const sidebarToggle = document.getElementById('sidebar-toggle') as HTMLButtonElement | null;
-
-    if (ctaPill && !isExtensionPage) {
-      ctaPill.disabled = true;
-    }
-
-    const sidebarCollapsedKey = `${fallbackStoragePrefix}sidebarCollapsed`;
-
-    const readSidebarCollapsed = (): boolean => {
-      try {
-        const raw = localStorage.getItem(sidebarCollapsedKey);
-        // 右側レール（アイコン中心）を基本にしたいので、未設定時は折りたたみ状態をデフォルトにする。
-        if (raw === null) return true;
-        return raw === '1';
-      } catch {
-        return true;
-      }
-    };
-
-    const writeSidebarCollapsed = (collapsed: boolean): void => {
-      try {
-        localStorage.setItem(sidebarCollapsedKey, collapsed ? '1' : '0');
-      } catch {
-        // ignore
-      }
-    };
-
-    const applySidebarCollapsed = (collapsed: boolean): void => {
-      document.body.classList.toggle('sidebar-collapsed', collapsed);
-      if (sidebarToggle) {
-        sidebarToggle.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
-        sidebarToggle.title = collapsed ? 'メニューを開く' : 'メニューを折りたたむ';
-      }
-    };
-
-    applySidebarCollapsed(readSidebarCollapsed());
-
-    sidebarToggle?.addEventListener('click', () => {
-      const nextCollapsed = !document.body.classList.contains('sidebar-collapsed');
-      applySidebarCollapsed(nextCollapsed);
-      writeSidebarCollapsed(nextCollapsed);
-    });
-
-    const updateHero = (activeTargetId?: string): void => {
-      if (!heroChip || !ctaPill) return;
-      ctaPill.textContent = '';
-      ctaPill.hidden = true;
-      if (activeTargetId === 'pane-actions') {
-        heroChip.textContent = 'アクション';
-        return;
-      }
-      if (activeTargetId === 'pane-settings') {
-        heroChip.textContent = '設定';
-        return;
-      }
-      heroChip.textContent = 'テーブルソート';
-    };
-
-    const setActive = (targetId?: string): void => {
-      const resolvedTargetId =
-        targetId || navItems.find(item => item.classList.contains('active'))?.dataset.target || panes[0]?.id;
-
-      if (!resolvedTargetId) return;
-
-      navItems.forEach(nav => {
-        const isActive = nav.dataset.target === resolvedTargetId;
-        nav.classList.toggle('active', isActive);
-        nav.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      });
-
-      panes.forEach(pane => {
-        pane.classList.toggle('active', pane.id === resolvedTargetId);
-      });
-
-      updateHero(resolvedTargetId);
-    };
-
-    const getTargetFromHash = (): string | undefined => {
-      const hash = window.location.hash.replace(/^#/, '');
-      if (!hash) return undefined;
-      if (!document.getElementById(hash)) return undefined;
-      return hash;
-    };
-
-    navItems.forEach(item => {
-      item.addEventListener('click', event => {
-        if (!isExtensionPage) {
-          // 通常ページ（file:// など）ではアンカーのデフォルト挙動に任せて `:target` を更新する。
-          // `hashchange` で setActive が呼ばれるので、ここで何もしなくてOK。
-          return;
-        }
-
-        // `href="#pane-..."` のデフォルト挙動（アンカーへのスクロール）を止めて、
-        // タブ切り替え時にスクロール位置が意図せず動かないようにする。
-        event.preventDefault();
-
-        const targetId = item.dataset.target;
-        if (!targetId) return;
-
-        setActive(targetId);
-
-        // `location.hash = ...` はスクロールしてしまうので replaceState でURLだけ更新する。
-        const nextHash = `#${targetId}`;
-        if (window.location.hash !== nextHash) {
-          window.history.replaceState(null, '', nextHash);
-        }
-      });
-    });
-
-    window.addEventListener('hashchange', () => {
-      setActive(getTargetFromHash());
-    });
-
-    setActive(getTargetFromHash());
   }
 
   async function loadOpenAiToken(input: HTMLInputElement | null): Promise<void> {

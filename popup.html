@@ -23,19 +23,7 @@
               <p class="subtitle">ブラウザ作業を少しラクにするツールセット</p>
             </div>
           </div>
-          <div class="header-actions">
-            <button
-              type="button"
-              class="icon-btn"
-              id="sidebar-toggle"
-              aria-label="メニューを切り替え"
-              aria-pressed="false"
-              title="メニュー"
-            >
-              ☰
-            </button>
-            <button type="button" class="cta-pill" id="cta-pill" hidden></button>
-          </div>
+          <button type="button" class="cta-pill" id="cta-pill" hidden></button>
         </header>
 
         <section class="pane active" id="pane-actions" role="tabpanel" aria-label="アクション">
@@ -49,10 +37,6 @@
                 <button id="open-calendar" class="btn btn-ghost" hidden>Googleカレンダー</button>
                 <button id="download-ics" class="btn btn-ghost" hidden>.ics</button>
               </div>
-            </div>
-            <div class="meta-card">
-              <p class="meta-title">事前準備</p>
-              <p class="meta-note">先に「設定」でTokenを保存。</p>
             </div>
           </div>
 
@@ -132,10 +116,6 @@
                 </label>
               </div>
             </div>
-            <div class="meta-card">
-              <p class="meta-title">Autoモード</p>
-              <p class="meta-note">URLパターンで自動起動。手動もOK。</p>
-            </div>
           </div>
 
           <div class="card-grid">
@@ -161,20 +141,6 @@
 
               <div id="pattern-list" class="pattern-list" aria-live="polite"></div>
             </div>
-
-            <div class="card secondary">
-              <div class="card-header">
-                <div>
-                  <p class="card-eyebrow">How to</p>
-                  <h3>シンプルな使い方</h3>
-                </div>
-              </div>
-              <ul class="bullet-list">
-                <li>「このタブで実行」だけでOK。</li>
-                <li>自動ON：パターン登録で開くだけ。</li>
-                <li>ヘッダーで昇順/降順。</li>
-              </ul>
-            </div>
           </div>
         </section>
 
@@ -184,10 +150,6 @@
               <p class="pane-eyebrow">設定</p>
               <h2>AI連携</h2>
               <p class="muted">出力スタイルと OpenAI Token を設定します。</p>
-            </div>
-            <div class="meta-card">
-              <p class="meta-title">保存先</p>
-              <p class="meta-note">ローカルに平文保存。必要ならクリア。</p>
             </div>
           </div>
 
@@ -233,15 +195,39 @@
               <button id="test-openai-token" class="btn btn-ghost">動作確認</button>
               <button id="clear-openai-token" class="btn btn-ghost">クリア</button>
             </div>
-            <p class="hint">平文保存です。共有環境ではクリア推奨。</p>
           </div>
         </section>
       </main>
 
       <aside class="sidebar" aria-label="メニュー">
-        <div class="sidebar-brand" aria-hidden="true">
+        <button
+          type="button"
+          class="sidebar-brand sidebar-home"
+          id="sidebar-home"
+          aria-label="ホーム（アクション）へ"
+          title="アクションへ"
+          data-tooltip="ホーム"
+        >
           <img src="images/logo.png" alt="" class="brand-logo" />
-        </div>
+        </button>
+        <button
+          type="button"
+          class="nav-item nav-toggle"
+          id="sidebar-toggle"
+          aria-label="メニューを切り替え"
+          aria-pressed="false"
+          title="メニュー"
+          data-tooltip="メニュー"
+        >
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" focusable="false">
+              <path d="M4 7h16" />
+              <path d="M4 12h16" />
+              <path d="M4 17h16" />
+            </svg>
+          </span>
+          <span class="nav-label">メニュー</span>
+        </button>
         <a
           class="nav-item active"
           data-target="pane-actions"
@@ -250,8 +236,13 @@
           aria-controls="pane-actions"
           aria-label="アクション"
           title="アクション"
+          data-tooltip="アクション"
         >
-          <span class="nav-icon">⚡</span>
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" focusable="false">
+              <path d="M13 2 3 14h7l-1 8 12-14h-7l-1-6Z" />
+            </svg>
+          </span>
           <span class="nav-label">アクション</span>
         </a>
         <a
@@ -262,8 +253,18 @@
           aria-controls="pane-table"
           aria-label="テーブルソート"
           title="テーブル"
+          data-tooltip="テーブル"
         >
-          <span class="nav-icon">⇅</span>
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" focusable="false">
+              <path d="M8 6h10" />
+              <path d="M8 12h10" />
+              <path d="M8 18h10" />
+              <path d="M6 8 4 6 2 8" />
+              <path d="M4 6v12" />
+              <path d="M2 16l2 2 2-2" />
+            </svg>
+          </span>
           <span class="nav-label">テーブル</span>
         </a>
         <a
@@ -274,8 +275,16 @@
           aria-controls="pane-settings"
           aria-label="設定"
           title="設定"
+          data-tooltip="設定"
         >
-          <span class="nav-icon">⚙</span>
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" focusable="false">
+              <path
+                d="M12 2l1 2a7.9 7.9 0 0 1 2 1l2-1 2 4-2 1a7.9 7.9 0 0 1 0 2l2 1-2 4-2-1a7.9 7.9 0 0 1-2 1l-1 2h-4l-1-2a7.9 7.9 0 0 1-2-1l-2 1-2-4 2-1a7.9 7.9 0 0 1 0-2L1 8l2-4 2 1a7.9 7.9 0 0 1 2-1l1-2h4Z"
+              />
+              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+            </svg>
+          </span>
           <span class="nav-label">設定</span>
         </a>
       </aside>
