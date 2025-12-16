@@ -12,7 +12,13 @@ type SummaryTarget = {
 type ContentScriptMessage =
   | { action: "showNotification"; message: string }
   | { action: "getSummaryTargetText" }
-  | { action: "showSummaryOverlay"; summary: string; source: SummarySource };
+  | {
+      action: "showSummaryOverlay";
+      status: "loading" | "ready" | "error";
+      source: SummarySource;
+      summary?: string;
+      error?: string;
+    };
 
 type BackgroundRequest = { action: "summarizeTab"; tabId: number };
 
@@ -49,35 +55,54 @@ chrome.contextMenus.onClicked.addListener(
     }
 
     void (async () => {
-      await sendMessageToTab(tabId, {
-        action: "showNotification",
-        message: "要約中...",
-      });
-
       const selection = info.selectionText?.trim() ?? "";
-      const target: SummaryTarget = selection
-        ? {
-            text: selection,
-            source: "selection",
-            title: tab?.title,
-            url: tab?.url,
-          }
-        : await sendMessageToTab(tabId, { action: "getSummaryTargetText" });
+      const initialSource: SummarySource = selection ? "selection" : "page";
 
-      const result = await summarizeWithOpenAI(target);
-      if (!result.ok) {
-        await sendMessageToTab(tabId, {
-          action: "showNotification",
-          message: result.error,
+      try {
+        await sendMessageToTab<ContentScriptMessage, unknown>(tabId, {
+          action: "showSummaryOverlay",
+          status: "loading",
+          source: initialSource,
         });
-        return;
-      }
 
-      await sendMessageToTab(tabId, {
-        action: "showSummaryOverlay",
-        summary: result.summary,
-        source: result.source,
-      });
+        const target: SummaryTarget = selection
+          ? {
+              text: selection,
+              source: "selection",
+              title: tab?.title,
+              url: tab?.url,
+            }
+          : await sendMessageToTab(tabId, { action: "getSummaryTargetText" });
+
+        const result = await summarizeWithOpenAI(target);
+        if (!result.ok) {
+          await sendMessageToTab<ContentScriptMessage, unknown>(tabId, {
+            action: "showSummaryOverlay",
+            status: "error",
+            source: target.source,
+            error: result.error,
+          });
+          return;
+        }
+
+        await sendMessageToTab<ContentScriptMessage, unknown>(tabId, {
+          action: "showSummaryOverlay",
+          status: "ready",
+          summary: result.summary,
+          source: result.source,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "要約に失敗しました";
+        await sendMessageToTab<ContentScriptMessage, unknown>(tabId, {
+          action: "showSummaryOverlay",
+          status: "error",
+          source: initialSource,
+          error: message,
+        }).catch(() => {
+          // コンテンツスクリプトに送れないページでは、黙って諦める
+        });
+      }
     })();
   },
 );
