@@ -3,6 +3,7 @@
 ## High-level Organization
 - Root contains extension assets (`manifest.json`, `popup.html`, CSS, icons/images).
 - `src/` contains TypeScript source for each runtime surface (background/content/popup) plus shared utilities.
+- `src/` is intentionally modular: shared helpers live under `src/utils/` and small feature helpers can live under feature folders like `src/popup/`.
 - `dist/` is generated build output (bundled JS); it is treated as an artifact, not a source of truth.
 - `tests/` contains Vitest unit tests with a `jsdom` environment.
 
@@ -19,15 +20,15 @@
   - Can send one-off commands to the active tab (e.g., “enable table sort now”).
 
 ## Common Code Patterns
-- Each entry point is structured as an IIFE to avoid leaking globals into the page/popup scope.
+- Content/popup source code is wrapped in an IIFE to avoid leaking globals into the page/popup scope; background runs in the service worker global scope.
 - Runtime message passing uses small, discriminated unions (`{ action: '...' }`) for safety and testability.
-- Storage access is centralized behind helper functions (`storageSyncGet/Set`, `storageLocalGet/Set`) to:
+- Storage access is wrapped behind small helper functions (`storageSyncGet/Set`, `storageLocalGet/Set`), typically defined per runtime file, to:
   - Normalize callback APIs into Promises
   - Handle missing APIs in non-extension contexts (tests)
   - Surface `lastError` reliably
+- Cross-cutting features prefer “thin shared modules” (e.g. OpenAI fetch/JSON parsing/date handling) rather than large shared frameworks.
 
 ## Naming & Conventions
 - Prefer clear, typed “request/response” message shapes over ad-hoc `any` messages.
 - Keep UI text and default prompts Japanese-first for consistency with current UX.
 - When adding new utilities, keep them self-contained and attached to one runtime boundary (content/background/popup) unless there’s a clear shared need.
-
