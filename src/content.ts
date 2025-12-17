@@ -120,6 +120,7 @@
         }
         case 'showNotification': {
           showNotification(request.message);
+          sendResponse({ ok: true });
           return;
         }
         case 'getSummaryTargetText': {
@@ -140,10 +141,12 @@
         }
         case 'showSummaryOverlay': {
           showSummaryOverlay(request);
+          sendResponse({ ok: true });
           return;
         }
         case 'showActionOverlay': {
           showActionOverlay(request);
+          sendResponse({ ok: true });
           return;
         }
       }
