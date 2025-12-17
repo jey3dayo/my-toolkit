@@ -49,7 +49,7 @@ describe('patternToRegex (src/content.ts)', () => {
 
   afterAll(() => {
     vi.unstubAllGlobals();
-    delete globalThis.__MBU_TEST_HOOKS__;
+    globalThis.__MBU_TEST_HOOKS__ = undefined;
   });
 
   it('allows optional trailing slash and query/hash suffix when safe', () => {

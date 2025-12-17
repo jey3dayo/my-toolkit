@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Browser Utils</title>
-    <link rel="stylesheet" href="popup.css" />
+    <link rel="stylesheet" href="popup.css">
   </head>
   <body class="no-js">
     <div class="app-shell">
@@ -12,7 +12,7 @@
         <header class="content-header">
           <div class="title-block">
             <div class="hero-logo-wrap" aria-hidden="true">
-              <img src="images/logo.png" alt="" class="hero-logo" />
+              <img src="images/logo.png" alt="" class="hero-logo">
             </div>
             <div class="title-text">
               <div class="title-row">
@@ -49,7 +49,10 @@
                 </div>
                 <div id="action-buttons" class="action-buttons" aria-label="アクションボタン一覧"></div>
                 <p class="hint">
-                  変数: <code>{{text}}</code> <code>{{title}}</code> <code>{{url}}</code> <code>{{source}}</code>
+                  変数: <code>{{text}}</code>
+                  <code>{{title}}</code>
+                  <code>{{url}}</code>
+                  <code>{{source}}</code>
                 </p>
               </div>
 
@@ -62,7 +65,7 @@
                   <span class="chip chip-soft">任意</span>
                 </div>
                 <label class="field-label" for="action-title">タイトル</label>
-                <input type="text" id="action-title" class="token-input" placeholder="例: 日本語に翻訳" />
+                <input type="text" id="action-title" class="token-input" placeholder="例: 日本語に翻訳">
                 <label class="field-label" for="action-kind">種類</label>
                 <select id="action-kind" class="token-input" aria-label="アクション種類">
                   <option value="text" selected>テキスト生成</option>
@@ -109,7 +112,7 @@
                 <div class="action-row">
                   <button id="enable-table-sort" class="btn btn-primary">このタブで実行</button>
                   <label class="checkbox-inline">
-                    <input type="checkbox" id="auto-enable-sort" />
+                    <input type="checkbox" id="auto-enable-sort">
                     開いたら自動で有効化
                   </label>
                 </div>
@@ -133,7 +136,7 @@
                     placeholder="例: *.moneyforward.com/bs/*"
                     class="pattern-input"
                     aria-label="ドメインパターン"
-                  />
+                  >
                   <button id="add-pattern" class="btn btn-ghost">追加</button>
                 </div>
 
@@ -183,7 +186,7 @@
 
               <label class="field-label" for="openai-token">OpenAI API Token</label>
               <div class="token-row token-row-main">
-                <input type="password" id="openai-token" placeholder="sk-..." class="token-input" autocomplete="off" />
+                <input type="password" id="openai-token" placeholder="sk-..." class="token-input" autocomplete="off">
                 <button id="toggle-openai-token-visibility" class="btn btn-ghost" aria-label="トークンの表示切り替え">
                   表示
                 </button>
@@ -205,8 +208,8 @@
           <button type="button" class="menu-close" id="menu-close" aria-label="閉じる" title="閉じる">
             <span aria-hidden="true">
               <svg viewBox="0 0 24 24" role="img" focusable="false">
-                <path d="M6 6l12 12" />
-                <path d="M18 6 6 18" />
+                <path d="M6 6l12 12"/>
+                <path d="M18 6 6 18"/>
               </svg>
             </span>
           </button>
@@ -215,7 +218,7 @@
           <a class="menu-item" data-target="pane-actions" href="#pane-actions" aria-label="アクション">
             <span class="menu-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" role="img" focusable="false">
-                <path d="M13 2 3 14h7l-1 8 12-14h-7l-1-6Z" />
+                <path d="M13 2 3 14h7l-1 8 12-14h-7l-1-6Z"/>
               </svg>
             </span>
             <span class="menu-text">アクション</span>
@@ -223,12 +226,12 @@
           <a class="menu-item" data-target="pane-table" href="#pane-table" aria-label="テーブルソート">
             <span class="menu-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" role="img" focusable="false">
-                <path d="M8 6h10" />
-                <path d="M8 12h10" />
-                <path d="M8 18h10" />
-                <path d="M6 8 4 6 2 8" />
-                <path d="M4 6v12" />
-                <path d="M2 16l2 2 2-2" />
+                <path d="M8 6h10"/>
+                <path d="M8 12h10"/>
+                <path d="M8 18h10"/>
+                <path d="M6 8 4 6 2 8"/>
+                <path d="M4 6v12"/>
+                <path d="M2 16l2 2 2-2"/>
               </svg>
             </span>
             <span class="menu-text">テーブルソート</span>
@@ -240,7 +243,7 @@
                 <path
                   d="M12 2l1 2a7.9 7.9 0 0 1 2 1l2-1 2 4-2 1a7.9 7.9 0 0 1 0 2l2 1-2 4-2-1a7.9 7.9 0 0 1-2 1l-1 2h-4l-1-2a7.9 7.9 0 0 1-2-1l-2 1-2-4 2-1a7.9 7.9 0 0 1 0-2L1 8l2-4 2 1a7.9 7.9 0 0 1 2-1l1-2h4Z"
                 />
-                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
               </svg>
             </span>
             <span class="menu-text">設定</span>
@@ -259,9 +262,9 @@
           data-tooltip="メニュー"
         >
           <svg viewBox="0 0 24 24" role="img" focusable="false" aria-hidden="true">
-            <path d="M4 7h16" />
-            <path d="M4 12h16" />
-            <path d="M4 17h16" />
+            <path d="M4 7h16"/>
+            <path d="M4 12h16"/>
+            <path d="M4 17h16"/>
           </svg>
         </button>
         <a
@@ -276,7 +279,7 @@
         >
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" role="img" focusable="false">
-              <path d="M13 2 3 14h7l-1 8 12-14h-7l-1-6Z" />
+              <path d="M13 2 3 14h7l-1 8 12-14h-7l-1-6Z"/>
             </svg>
           </span>
           <span class="nav-label">アクション</span>
@@ -293,12 +296,12 @@
         >
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" role="img" focusable="false">
-              <path d="M8 6h10" />
-              <path d="M8 12h10" />
-              <path d="M8 18h10" />
-              <path d="M6 8 4 6 2 8" />
-              <path d="M4 6v12" />
-              <path d="M2 16l2 2 2-2" />
+              <path d="M8 6h10"/>
+              <path d="M8 12h10"/>
+              <path d="M8 18h10"/>
+              <path d="M6 8 4 6 2 8"/>
+              <path d="M4 6v12"/>
+              <path d="M2 16l2 2 2-2"/>
             </svg>
           </span>
           <span class="nav-label">テーブル</span>
@@ -318,7 +321,7 @@
               <path
                 d="M12 2l1 2a7.9 7.9 0 0 1 2 1l2-1 2 4-2 1a7.9 7.9 0 0 1 0 2l2 1-2 4-2-1a7.9 7.9 0 0 1-2 1l-1 2h-4l-1-2a7.9 7.9 0 0 1-2-1l-2 1-2-4 2-1a7.9 7.9 0 0 1 0-2L1 8l2-4 2 1a7.9 7.9 0 0 1 2-1l1-2h4Z"
               />
-              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
             </svg>
           </span>
           <span class="nav-label">設定</span>

@@ -44,7 +44,7 @@ function coerceContextAction(value: unknown): ContextAction | null {
   const title = typeof raw.title === 'string' ? raw.title.trim() : '';
   const kind = raw.kind === 'event' ? 'event' : raw.kind === 'text' ? 'text' : null;
   const prompt = typeof raw.prompt === 'string' ? raw.prompt : '';
-  if (!id || !title || !kind) return null;
+  if (!(id && title && kind)) return null;
   return { id, title, kind, prompt };
 }
 

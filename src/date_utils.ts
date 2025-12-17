@@ -3,7 +3,7 @@ import { addDays, addHours as addHoursDateFns, format, isMatch, isValid, parse, 
 function normalizeDateTimeInput(value: string): string {
   return value
     .trim()
-    .replace(/[０-９]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xff10 + 0x30))
+    .replace(/[０-９]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xff_10 + 0x30))
     .replace(/：/g, ':')
     .replace(/／/g, '/')
     .replace(/[－‐‑‒–—―]/g, '-')

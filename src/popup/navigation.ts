@@ -35,7 +35,7 @@ function getElements(document: Document): NavigationElements {
 
 function updateHero(elements: NavigationElements, activeTargetId?: string): void {
   const { heroChip, ctaPill } = elements;
-  if (!heroChip || !ctaPill) return;
+  if (!(heroChip && ctaPill)) return;
 
   ctaPill.textContent = '';
   ctaPill.hidden = true;
@@ -82,8 +82,8 @@ function setActive(elements: NavigationElements, targetId?: string): void {
 
 function getTargetFromHash(document: Document, window: Window): string | undefined {
   const hash = window.location.hash.replace(/^#/, '');
-  if (!hash) return undefined;
-  if (!document.getElementById(hash)) return undefined;
+  if (!hash) return;
+  if (!document.getElementById(hash)) return;
   return hash;
 }
 

@@ -1,7 +1,7 @@
 // Background Service Worker
 
 import { Result } from '@praha/byethrow';
-import { DEFAULT_CONTEXT_ACTIONS, normalizeContextActions, type ContextAction } from './context_actions';
+import { type ContextAction, DEFAULT_CONTEXT_ACTIONS, normalizeContextActions } from './context_actions';
 import { parseDateOnlyToYyyyMmDd, parseDateTimeLoose } from './date_utils';
 import { computeEventDateRange } from './event_date_range';
 import type { ExtractedEvent, SummarySource } from './shared_types';
@@ -529,7 +529,7 @@ async function summarizeWithOpenAI(target: SummaryTarget): Promise<BackgroundRes
   }
   const settings = settingsResult.value;
 
-  const MAX_INPUT_CHARS = 20000;
+  const MAX_INPUT_CHARS = 20_000;
   const rawText = target.text.trim();
   if (!rawText) {
     return { ok: false, error: '要約対象のテキストが見つかりませんでした' };
@@ -596,7 +596,7 @@ async function runPromptActionWithOpenAI(
   }
   const settings = settingsResult.value;
 
-  const MAX_INPUT_CHARS = 20000;
+  const MAX_INPUT_CHARS = 20_000;
   const rawText = target.text.trim();
   if (!rawText) {
     return { ok: false, error: '対象のテキストが見つかりませんでした' };
@@ -724,7 +724,7 @@ async function extractEventWithOpenAI(
     return { ok: false, error: '要約対象のテキストが見つかりませんでした' };
   }
 
-  const MAX_INPUT_CHARS = 20000;
+  const MAX_INPUT_CHARS = 20_000;
   const clippedText = rawText.length > MAX_INPUT_CHARS ? `${rawText.slice(0, MAX_INPUT_CHARS)}\n\n(以下略)` : rawText;
 
   const meta = target.title || target.url ? `\n\n---\nタイトル: ${target.title ?? '-'}\nURL: ${target.url ?? '-'}` : '';

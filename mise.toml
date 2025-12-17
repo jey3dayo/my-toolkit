@@ -13,23 +13,22 @@ _.path = ["./node_modules/.bin"]
 [tools]
 node = "24"
 "npm:pnpm" = "10.25.0"
-"npm:prettier" = "3.7.4"
 
 # ========================================
 # コマンド（ショートカット）
 # ========================================
 
 [tasks.format]
-description = "Prettierでソース全体を整形"
+description = "Ultracite(Biome)でソース全体を整形"
 run = "pnpm run format"
 
 [tasks."lint:types"]
 description = "TypeScriptの型チェックのみ"
 run = "pnpm exec tsc --noEmit"
 
-[tasks."lint:prettier"]
-description = "Prettierのチェックのみ"
-run = "pnpm run prettier:check"
+[tasks."lint:ultracite"]
+description = "Ultracite(Biome)のチェックのみ"
+run = "pnpm run lint"
 
 [tasks.test]
 description = "Vitestでユニットテストを実行"
@@ -37,11 +36,7 @@ run = "pnpm run test"
 
 [tasks.lint]
 description = "型チェックとフォーマット検証を実行"
-depends = ["lint:types", "lint:prettier", "lint:eslint"]
-
-[tasks."lint:eslint"]
-description = "ESLintのチェックのみ"
-run = "pnpm run lint:eslint"
+depends = ["lint:types", "lint:ultracite"]
 
 [tasks.build]
 description = "TypeScriptをビルド"

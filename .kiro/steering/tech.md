@@ -34,5 +34,5 @@
 
 ## Quality Gates
 - Tests: `vitest` with `jsdom`; tests stub the `chrome` global.
-- Formatting: Prettier (single quotes, wider line width) with import sorting.
-- Linting: ESLint (flat config) with TypeScript rules and import sorting conventions.
+- Formatting: Ultracite (Biome) with single quotes and wider line width.
+- Linting: Ultracite (Biome) ruleset, with Chrome extension globals configured.

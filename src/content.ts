@@ -200,10 +200,10 @@ import type { SummarySource } from './shared_types';
       const aCell = a.cells[columnIndex]?.textContent?.trim() ?? '';
       const bCell = b.cells[columnIndex]?.textContent?.trim() ?? '';
 
-      const aNum = parseFloat(aCell);
-      const bNum = parseFloat(bCell);
+      const aNum = Number.parseFloat(aCell);
+      const bNum = Number.parseFloat(bCell);
 
-      if (!Number.isNaN(aNum) && !Number.isNaN(bNum)) {
+      if (!(Number.isNaN(aNum) || Number.isNaN(bNum))) {
         return isAscending ? aNum - bNum : bNum - aNum;
       }
 
@@ -828,7 +828,7 @@ import type { SummarySource } from './shared_types';
     primary: string,
     secondary: string,
     status: 'loading' | 'ready' | 'error',
-    loadingLabel: string = '要約中...',
+    loadingLabel = '要約中...',
   ): void {
     const els = ensureOverlay();
     els.primaryText.textContent = primary;

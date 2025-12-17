@@ -1,9 +1,9 @@
 import { Result } from '@praha/byethrow';
 import {
-  DEFAULT_CONTEXT_ACTIONS,
-  normalizeContextActions,
   type ContextAction,
   type ContextActionKind,
+  DEFAULT_CONTEXT_ACTIONS,
+  normalizeContextActions,
 } from './context_actions';
 import { formatUtcDateTimeFromDate } from './date_utils';
 import { computeEventDateRange } from './event_date_range';
@@ -333,7 +333,7 @@ import type { LocalStorageData } from './storage/types';
         }
 
         contextActions = DEFAULT_CONTEXT_ACTIONS;
-        await storageSyncSet({ contextActions: contextActions });
+        await storageSyncSet({ contextActions });
         renderContextActions();
       } catch (error) {
         contextActions = DEFAULT_CONTEXT_ACTIONS;
@@ -400,9 +400,7 @@ import type { LocalStorageData } from './storage/types';
           lastEvent = response.event;
           if (openCalendarButton) openCalendarButton.hidden = false;
           if (downloadIcsButton) downloadIcsButton.hidden = false;
-        } else {
-          if (actionOutput) actionOutput.value = response.text;
-        }
+        } else if (actionOutput) actionOutput.value = response.text;
 
         if (copyActionOutputButton) copyActionOutputButton.disabled = false;
         showNotification('完了しました');
@@ -423,7 +421,7 @@ import type { LocalStorageData } from './storage/types';
       const target = event.target as HTMLElement | null;
       const action = target?.closest<HTMLElement>('button')?.dataset.action;
       const actionId = target?.closest<HTMLElement>('button')?.dataset.actionId;
-      if (!action || !actionId) return;
+      if (!(action && actionId)) return;
 
       if (action === 'edit') {
         const found = contextActions.find(item => item.id === actionId) ?? null;
@@ -544,7 +542,7 @@ import type { LocalStorageData } from './storage/types';
   }
 
   function sendMessageToBackground<TRequest, TResponse>(message: TRequest): Promise<TResponse> {
-    if (!isExtensionPage || !(chrome as unknown as { runtime?: unknown }).runtime) {
+    if (!(isExtensionPage && (chrome as unknown as { runtime?: unknown }).runtime)) {
       return Promise.reject(new Error('拡張機能として開いてください（chrome-extension://...）'));
     }
     return new Promise((resolve, reject) => {
@@ -591,7 +589,7 @@ import type { LocalStorageData } from './storage/types';
   }
 
   function storageSyncGet(keys: string[]): Promise<unknown> {
-    if (!isExtensionPage || !(chrome as unknown as { storage?: unknown }).storage) {
+    if (!(isExtensionPage && (chrome as unknown as { storage?: unknown }).storage)) {
       return Promise.resolve(fallbackStorageGet('sync', keys));
     }
     return new Promise((resolve, reject) => {
@@ -607,7 +605,7 @@ import type { LocalStorageData } from './storage/types';
   }
 
   function storageSyncSet(items: Record<string, unknown>): Promise<void> {
-    if (!isExtensionPage || !(chrome as unknown as { storage?: unknown }).storage) {
+    if (!(isExtensionPage && (chrome as unknown as { storage?: unknown }).storage)) {
       fallbackStorageSet('sync', items);
       return Promise.resolve();
     }
@@ -624,7 +622,7 @@ import type { LocalStorageData } from './storage/types';
   }
 
   function storageLocalGet(keys: string[]): Promise<unknown> {
-    if (!isExtensionPage || !(chrome as unknown as { storage?: unknown }).storage) {
+    if (!(isExtensionPage && (chrome as unknown as { storage?: unknown }).storage)) {
       return Promise.resolve(fallbackStorageGet('local', keys));
     }
     return new Promise((resolve, reject) => {
@@ -640,7 +638,7 @@ import type { LocalStorageData } from './storage/types';
   }
 
   function storageLocalSet(items: Record<string, unknown>): Promise<void> {
-    if (!isExtensionPage || !(chrome as unknown as { storage?: unknown }).storage) {
+    if (!(isExtensionPage && (chrome as unknown as { storage?: unknown }).storage)) {
       fallbackStorageSet('local', items);
       return Promise.resolve();
     }
@@ -657,7 +655,7 @@ import type { LocalStorageData } from './storage/types';
   }
 
   function storageLocalRemove(keys: string[] | string): Promise<void> {
-    if (!isExtensionPage || !(chrome as unknown as { storage?: unknown }).storage) {
+    if (!(isExtensionPage && (chrome as unknown as { storage?: unknown }).storage)) {
       fallbackStorageRemove('local', keys);
       return Promise.resolve();
     }
@@ -674,7 +672,7 @@ import type { LocalStorageData } from './storage/types';
   }
 
   function tabsQuery(queryInfo: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]> {
-    if (!isExtensionPage || !(chrome as unknown as { tabs?: unknown }).tabs) {
+    if (!(isExtensionPage && (chrome as unknown as { tabs?: unknown }).tabs)) {
       return Promise.reject(new Error('拡張機能として開いてください（chrome-extension://...）'));
     }
     return new Promise((resolve, reject) => {
