@@ -41,8 +41,6 @@
     | { action: 'summarizeText'; target: SummaryTarget }
     | { action: 'summarizeEvent'; target: SummaryTarget };
 
-  type SummarizeTextResponse = { ok: true; summary: string; source: SummarySource } | { ok: false; error: string };
-
   type SummarizeEventResponse =
     | { ok: true; event: unknown; calendarUrl: string; eventText: string }
     | { ok: false; error: string };
@@ -126,8 +124,17 @@
         }
         case 'getSummaryTargetText': {
           void (async () => {
-            const target = await getSummaryTargetText();
-            sendResponse(target);
+            try {
+              const target = await getSummaryTargetText();
+              sendResponse(target);
+            } catch {
+              sendResponse({
+                text: '',
+                source: 'page',
+                title: document.title ?? '',
+                url: window.location.href,
+              } satisfies SummaryTarget);
+            }
           })();
           return true;
         }
@@ -252,7 +259,7 @@
   // 5. UI・通知関連
   // ========================================
 
-  document.addEventListener('mouseup', event => {
+  document.addEventListener('mouseup', () => {
     const selectedText = window.getSelection()?.toString().trim() ?? '';
     if (selectedText) {
       void storageLocalSet({ selectedText, selectedTextUpdatedAt: Date.now() }).catch(() => {
@@ -324,10 +331,15 @@
       };
     }
 
-    const storedSelection = (await storageLocalGet(['selectedText', 'selectedTextUpdatedAt'])) as {
-      selectedText?: string;
-      selectedTextUpdatedAt?: number;
-    };
+    let storedSelection: { selectedText?: string; selectedTextUpdatedAt?: number } = {};
+    try {
+      storedSelection = (await storageLocalGet(['selectedText', 'selectedTextUpdatedAt'])) as {
+        selectedText?: string;
+        selectedTextUpdatedAt?: number;
+      };
+    } catch {
+      storedSelection = {};
+    }
     const fallbackSelection = storedSelection.selectedText?.trim() ?? '';
     const updatedAt = storedSelection.selectedTextUpdatedAt ?? 0;
     const isFresh = Date.now() - updatedAt <= 30_000;
@@ -342,8 +354,11 @@
     }
 
     const bodyText = document.body?.innerText ?? '';
+    const MAX_RETURN_CHARS = 60_000;
+    const normalized = normalizeText(bodyText);
+    const clipped = normalized.length > MAX_RETURN_CHARS ? `${normalized.slice(0, MAX_RETURN_CHARS)}\n\n(以下略)` : normalized;
     return {
-      text: normalizeText(bodyText),
+      text: clipped,
       source: 'page',
       title: document.title ?? '',
       url: window.location.href,

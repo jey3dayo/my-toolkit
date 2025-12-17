@@ -1,3 +1,5 @@
+import { Result } from '@praha/byethrow';
+
 import {
   addHours,
   formatLocalYyyyMmDdFromDate,
@@ -401,14 +403,13 @@ import { ensureOpenAiTokenConfigured } from './popup/token_guard';
         return;
       }
 
-      if (
-        !(await ensureOpenAiTokenConfigured({
-          storageLocalGet,
-          showNotification,
-          navigateToPane,
-          focusTokenInput,
-        }))
-      ) {
+      const tokenConfigured = await ensureOpenAiTokenConfigured({
+        storageLocalGet,
+        showNotification,
+        navigateToPane,
+        focusTokenInput,
+      });
+      if (Result.isFailure(tokenConfigured)) {
         return;
       }
 

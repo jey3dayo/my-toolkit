@@ -1,5 +1,7 @@
 // Background Service Worker
 
+import { Result } from '@praha/byethrow';
+
 import {
   addHours,
   formatLocalYyyyMmDdFromDate,
@@ -8,6 +10,9 @@ import {
   parseDateOnlyToYyyyMmDd,
   parseDateTimeLoose,
 } from './date_utils';
+import { toErrorMessage } from './utils/errors';
+import { safeParseJsonObject } from './utils/json';
+import { fetchOpenAiChatCompletionOk, fetchOpenAiChatCompletionText } from './utils/openai';
 
 type SummarySource = 'selection' | 'page';
 
@@ -124,10 +129,12 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
 let contextMenuRefreshQueue: Promise<void> = Promise.resolve();
 
-async function scheduleRefreshContextMenus(): Promise<void> {
-  contextMenuRefreshQueue = contextMenuRefreshQueue
+function scheduleRefreshContextMenus(): Promise<void> {
+  // 直前の更新が失敗しても次回を止めないようにしつつ、
+  // 非標準の thenable 等が混入しても壊れないように Promise.resolve で正規化する。
+  contextMenuRefreshQueue = Promise.resolve(contextMenuRefreshQueue)
     .catch(() => {
-      // 直前の更新が失敗しても、次回の更新を止めない
+      // no-op
     })
     .then(() => refreshContextMenus());
   return contextMenuRefreshQueue;
@@ -548,18 +555,37 @@ function sendMessageToTab<TRequest, TResponse>(tabId: number, message: TRequest)
   });
 }
 
-async function summarizeWithOpenAI(target: SummaryTarget): Promise<BackgroundResponse> {
-  const { openaiApiToken, openaiCustomPrompt } = (await storageLocalGet([
-    'openaiApiToken',
-    'openaiCustomPrompt',
-  ])) as LocalStorageData;
+type OpenAiSettings = {
+  token: string;
+  customPrompt: string;
+};
 
-  if (!openaiApiToken) {
-    return {
-      ok: false,
-      error: 'OpenAI API Tokenが未設定です（ポップアップの「設定」タブで設定してください）',
-    };
+function loadOpenAiSettings(): Result.ResultAsync<OpenAiSettings, string> {
+  return Result.pipe(
+    Result.try({
+      immediate: true,
+      try: () => storageLocalGet(['openaiApiToken', 'openaiCustomPrompt']),
+      catch: error => toErrorMessage(error, 'OpenAI設定の読み込みに失敗しました'),
+    }),
+    Result.map(data => data as LocalStorageData),
+    Result.map(data => ({
+      token: data.openaiApiToken?.trim() ?? '',
+      customPrompt: data.openaiCustomPrompt?.trim() ?? '',
+    })),
+    Result.andThen(settings =>
+      settings.token
+        ? Result.succeed(settings)
+        : Result.fail('OpenAI API Tokenが未設定です（ポップアップの「設定」タブで設定してください）'),
+    ),
+  );
+}
+
+async function summarizeWithOpenAI(target: SummaryTarget): Promise<BackgroundResponse> {
+  const settingsResult = await loadOpenAiSettings();
+  if (Result.isFailure(settingsResult)) {
+    return { ok: false, error: settingsResult.error };
   }
+  const settings = settingsResult.value;
 
   const MAX_INPUT_CHARS = 20000;
   const rawText = target.text.trim();
@@ -579,7 +605,7 @@ async function summarizeWithOpenAI(target: SummaryTarget): Promise<BackgroundRes
         role: 'system',
         content: [
           'あなたは日本語の要約アシスタントです。入力テキストを読み、要点を短く整理して出力してください。',
-          openaiCustomPrompt?.trim() ? `\n\nユーザーの追加指示:\n${openaiCustomPrompt.trim()}` : '',
+          settings.customPrompt ? `\n\nユーザーの追加指示:\n${settings.customPrompt}` : '',
         ]
           .join('')
           .trim(),
@@ -600,35 +626,12 @@ async function summarizeWithOpenAI(target: SummaryTarget): Promise<BackgroundRes
     ],
   };
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${openaiApiToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-
-  const json: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message =
-      typeof json === 'object' &&
-      json !== null &&
-      'error' in json &&
-      typeof (json as { error?: unknown }).error === 'object' &&
-      (json as { error: { message?: unknown } }).error !== null &&
-      typeof (json as { error: { message?: unknown } }).error.message === 'string'
-        ? (json as { error: { message: string } }).error.message
-        : `OpenAI APIエラー: ${response.status}`;
-    return { ok: false, error: message };
+  const summaryResult = await fetchOpenAiChatCompletionText(fetch, settings.token, body, '要約結果の取得に失敗しました');
+  if (Result.isFailure(summaryResult)) {
+    return { ok: false, error: summaryResult.error };
   }
 
-  const summary = extractChatCompletionText(json);
-  if (!summary) {
-    return { ok: false, error: '要約結果の取得に失敗しました' };
-  }
-
-  return { ok: true, summary, source: target.source };
+  return { ok: true, summary: summaryResult.value, source: target.source };
 }
 
 async function loadContextActions(): Promise<ContextAction[]> {
@@ -656,17 +659,11 @@ async function runPromptActionWithOpenAI(
   target: SummaryTarget,
   promptTemplate: string,
 ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
-  const { openaiApiToken, openaiCustomPrompt } = (await storageLocalGet([
-    'openaiApiToken',
-    'openaiCustomPrompt',
-  ])) as LocalStorageData;
-
-  if (!openaiApiToken) {
-    return {
-      ok: false,
-      error: 'OpenAI API Tokenが未設定です（ポップアップの「設定」タブで設定してください）',
-    };
+  const settingsResult = await loadOpenAiSettings();
+  if (Result.isFailure(settingsResult)) {
+    return { ok: false, error: settingsResult.error };
   }
+  const settings = settingsResult.value;
 
   const MAX_INPUT_CHARS = 20000;
   const rawText = target.text.trim();
@@ -697,50 +694,29 @@ async function runPromptActionWithOpenAI(
   const needsMeta = !(promptTemplate.includes('{{title}}') || promptTemplate.includes('{{url}}'));
   const userContent = [rendered.trim(), needsText ? `\n\n${clippedText}` : '', needsMeta ? meta : ''].join('').trim();
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${openaiApiToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      temperature: 0.2,
-      messages: [
-        {
-          role: 'system',
-          content: [
-            'あなたはユーザーの「Context Action」を実行するアシスタントです。指示に従い、必要な結果だけを簡潔に出力してください。',
-            openaiCustomPrompt?.trim() ? `\n\nユーザーの追加指示:\n${openaiCustomPrompt.trim()}` : '',
-          ]
-            .join('')
-            .trim(),
-        },
-        { role: 'user', content: userContent },
-      ],
-    }),
-  });
+  const body = {
+    model: 'gpt-4o-mini',
+    temperature: 0.2,
+    messages: [
+      {
+        role: 'system',
+        content: [
+          'あなたはユーザーの「Context Action」を実行するアシスタントです。指示に従い、必要な結果だけを簡潔に出力してください。',
+          settings.customPrompt ? `\n\nユーザーの追加指示:\n${settings.customPrompt}` : '',
+        ]
+          .join('')
+          .trim(),
+      },
+      { role: 'user', content: userContent },
+    ],
+  };
 
-  const json: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message =
-      typeof json === 'object' &&
-      json !== null &&
-      'error' in json &&
-      typeof (json as { error?: unknown }).error === 'object' &&
-      (json as { error: { message?: unknown } }).error !== null &&
-      typeof (json as { error: { message?: unknown } }).error.message === 'string'
-        ? (json as { error: { message: string } }).error.message
-        : `OpenAI APIエラー: ${response.status}`;
-    return { ok: false, error: message };
+  const textResult = await fetchOpenAiChatCompletionText(fetch, settings.token, body, '結果の取得に失敗しました');
+  if (Result.isFailure(textResult)) {
+    return { ok: false, error: textResult.error };
   }
 
-  const text = extractChatCompletionText(json);
-  if (!text) {
-    return { ok: false, error: '結果の取得に失敗しました' };
-  }
-
-  return { ok: true, text };
+  return { ok: true, text: textResult.value };
 }
 
 function renderInstructionTemplate(template: string, target: SummaryTarget): string {
@@ -761,56 +737,42 @@ function renderInstructionTemplate(template: string, target: SummaryTarget): str
   return rendered.trim();
 }
 
-function extractChatCompletionText(json: unknown): string | null {
-  if (typeof json !== 'object' || json === null) return null;
-  const choices = (json as { choices?: unknown }).choices;
-  if (!Array.isArray(choices) || choices.length === 0) return null;
-  const first = choices[0] as { message?: { content?: unknown } };
-  const content = first?.message?.content;
-  if (typeof content !== 'string') return null;
-  return content.trim();
-}
-
 async function testOpenAiToken(tokenOverride?: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { openaiApiToken } = (await storageLocalGet(['openaiApiToken'])) as LocalStorageData;
+  const overrideToken = tokenOverride?.trim() ?? '';
 
-  const token = tokenOverride?.trim() || openaiApiToken?.trim() || '';
-  if (!token) {
-    return {
-      ok: false,
-      error: 'OpenAI API Tokenが未設定です（ポップアップの「設定」タブで設定してください）',
-    };
+  const tokenResult = overrideToken
+    ? Result.succeed(overrideToken)
+    : Result.pipe(
+        Result.try({
+          immediate: true,
+          try: () => storageLocalGet(['openaiApiToken']),
+          catch: error => toErrorMessage(error, 'OpenAI設定の読み込みに失敗しました'),
+        }),
+        Result.map(data => (data as LocalStorageData).openaiApiToken?.trim() ?? ''),
+        Result.andThen(token =>
+          token
+            ? Result.succeed(token)
+            : Result.fail('OpenAI API Tokenが未設定です（ポップアップの「設定」タブで設定してください）'),
+        ),
+      );
+
+  const token = await tokenResult;
+  if (Result.isFailure(token)) {
+    return { ok: false, error: token.error };
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: 5,
-      temperature: 0,
-      messages: [
-        { role: 'system', content: 'You are a health check bot.' },
-        { role: 'user', content: 'Reply with OK.' },
-      ],
-    }),
+  const checkResult = await fetchOpenAiChatCompletionOk(fetch, token.value, {
+    model: 'gpt-4o-mini',
+    max_tokens: 5,
+    temperature: 0,
+    messages: [
+      { role: 'system', content: 'You are a health check bot.' },
+      { role: 'user', content: 'Reply with OK.' },
+    ],
   });
 
-  const json: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message =
-      typeof json === 'object' &&
-      json !== null &&
-      'error' in json &&
-      typeof (json as { error?: unknown }).error === 'object' &&
-      (json as { error: { message?: unknown } }).error !== null &&
-      typeof (json as { error: { message?: unknown } }).error.message === 'string'
-        ? (json as { error: { message: string } }).error.message
-        : `OpenAI APIエラー: ${response.status}`;
-    return { ok: false, error: message };
+  if (Result.isFailure(checkResult)) {
+    return { ok: false, error: checkResult.error };
   }
 
   return { ok: true };
@@ -820,17 +782,11 @@ async function extractEventWithOpenAI(
   target: SummaryTarget,
   extraInstruction?: string,
 ): Promise<{ ok: true; event: ExtractedEvent } | { ok: false; error: string }> {
-  const { openaiApiToken, openaiCustomPrompt } = (await storageLocalGet([
-    'openaiApiToken',
-    'openaiCustomPrompt',
-  ])) as LocalStorageData;
-
-  if (!openaiApiToken) {
-    return {
-      ok: false,
-      error: 'OpenAI API Tokenが未設定です（ポップアップの「設定」タブで設定してください）',
-    };
+  const settingsResult = await loadOpenAiSettings();
+  if (Result.isFailure(settingsResult)) {
+    return { ok: false, error: settingsResult.error };
   }
+  const settings = settingsResult.value;
 
   const rawText = target.text.trim();
   if (!rawText) {
@@ -842,82 +798,55 @@ async function extractEventWithOpenAI(
 
   const meta = target.title || target.url ? `\n\n---\nタイトル: ${target.title ?? '-'}\nURL: ${target.url ?? '-'}` : '';
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${openaiApiToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      temperature: 0.2,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content: [
-            'あなたはイベント抽出アシスタントです。入力テキストから、カレンダー登録に必要な情報を抽出してください。',
-            '出力は必ずJSONのみ。コードフェンス禁止。キーは title,start,end,allDay,location,description を使う。',
-            'start/end はISO 8601 (例: 2025-01-31T19:00:00+09:00) を優先。難しければ YYYY-MM-DD HH:mm でもOK。',
-            'YYYY/MM/DD や「2025年1月31日 19:00」のような表記は避けてください。',
-            '日付しか不明な場合は YYYY-MM-DD でOK。',
-            'end が不明なら省略可。allDay は終日なら true、それ以外は false または省略。',
-            'description はイベントの概要を日本語で短くまとめる。',
-            openaiCustomPrompt?.trim()
-              ? `\n\nユーザーの追加指示（descriptionの文体に反映）:\n${openaiCustomPrompt.trim()}`
-              : '',
-            extraInstruction?.trim() ? `\n\nこのアクションの追加指示:\n${extraInstruction.trim()}` : '',
-          ]
-            .join('\n')
-            .trim(),
-        },
-        {
-          role: 'user',
-          content: ['次のテキストからイベント情報を抽出し、JSONで返してください。', '', clippedText + meta].join('\n'),
-        },
-      ],
-    }),
-  });
+  const body = {
+    model: 'gpt-4o-mini',
+    temperature: 0.2,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system',
+        content: [
+          'あなたはイベント抽出アシスタントです。入力テキストから、カレンダー登録に必要な情報を抽出してください。',
+          '出力は必ずJSONのみ。コードフェンス禁止。キーは title,start,end,allDay,location,description を使う。',
+          'start/end はISO 8601 (例: 2025-01-31T19:00:00+09:00) を優先。難しければ YYYY-MM-DD HH:mm でもOK。',
+          'YYYY/MM/DD や「2025年1月31日 19:00」のような表記は避けてください。',
+          '日付しか不明な場合は YYYY-MM-DD でOK。',
+          'end が不明なら省略可。allDay は終日なら true、それ以外は false または省略。',
+          'description はイベントの概要を日本語で短くまとめる。',
+          settings.customPrompt ? `\n\nユーザーの追加指示（descriptionの文体に反映）:\n${settings.customPrompt}` : '',
+          extraInstruction?.trim() ? `\n\nこのアクションの追加指示:\n${extraInstruction.trim()}` : '',
+        ]
+          .join('\n')
+          .trim(),
+      },
+      {
+        role: 'user',
+        content: ['次のテキストからイベント情報を抽出し、JSONで返してください。', '', clippedText + meta].join('\n'),
+      },
+    ],
+  };
 
-  const json: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message =
-      typeof json === 'object' &&
-      json !== null &&
-      'error' in json &&
-      typeof (json as { error?: unknown }).error === 'object' &&
-      (json as { error: { message?: unknown } }).error !== null &&
-      typeof (json as { error: { message?: unknown } }).error.message === 'string'
-        ? (json as { error: { message: string } }).error.message
-        : `OpenAI APIエラー: ${response.status}`;
-    return { ok: false, error: message };
+  const contentResult = await fetchOpenAiChatCompletionText(
+    fetch,
+    settings.token,
+    body,
+    'イベント要約結果の取得に失敗しました',
+  );
+  if (Result.isFailure(contentResult)) {
+    return { ok: false, error: contentResult.error };
   }
 
-  const content = extractChatCompletionText(json);
-  if (!content) return { ok: false, error: 'イベント要約結果の取得に失敗しました' };
+  const eventResult = safeParseJsonObject<ExtractedEvent>(contentResult.value);
+  if (Result.isFailure(eventResult)) {
+    return { ok: false, error: 'イベント情報の解析に失敗しました' };
+  }
 
-  const event = safeParseJsonObject<ExtractedEvent>(content);
-  if (!event || typeof event.title !== 'string' || typeof event.start !== 'string') {
+  const event = eventResult.value;
+  if (typeof event.title !== 'string' || typeof event.start !== 'string') {
     return { ok: false, error: 'イベント情報の解析に失敗しました' };
   }
 
   return { ok: true, event: normalizeEvent(event) };
-}
-
-function safeParseJsonObject<T>(text: string): T | null {
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    const trimmed = text.trim();
-    const start = trimmed.indexOf('{');
-    const end = trimmed.lastIndexOf('}');
-    if (start === -1 || end === -1 || end <= start) return null;
-    try {
-      return JSON.parse(trimmed.slice(start, end + 1)) as T;
-    } catch {
-      return null;
-    }
-  }
 }
 
 function storageSyncGet(keys: string[]): Promise<unknown> {

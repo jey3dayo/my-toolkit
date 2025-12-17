@@ -17,6 +17,7 @@
     "prettier": "prettier --write --cache --log-level warn --ignore-path .prettierignore './*.{js,ts,jsx,tsx,css,html,json,md}' './{docs,src,tests}/**/*.{js,ts,jsx,tsx,css,html,json,md}'",
     "prettier:check": "prettier --check --cache --ignore-path .prettierignore './*.{js,ts,jsx,tsx,css,html,json,md}' './{docs,src,tests}/**/*.{js,ts,jsx,tsx,css,html,json,md}'",
     "format": "pnpm run prettier",
+    "lint": "pnpm run lint:eslint",
     "lint:eslint": "eslint .",
     "lint:eslint:fix": "eslint . --fix"
   },
