@@ -1,5 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
+
 import { setupPopupNavigation } from '../src/popup/navigation';
 
 function createPopupDom(url = 'https://example.test/popup.html#pane-actions') {

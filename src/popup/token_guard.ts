@@ -1,3 +1,5 @@
+import { Result } from '@praha/byethrow';
+
 type LocalStorageData = {
   openaiApiToken?: string;
 };
@@ -9,16 +11,29 @@ export type TokenGuardDeps = {
   focusTokenInput: () => void;
 };
 
-export async function ensureOpenAiTokenConfigured(deps: TokenGuardDeps): Promise<boolean> {
-  try {
-    const { openaiApiToken = '' } = (await deps.storageLocalGet(['openaiApiToken'])) as LocalStorageData;
-    if (openaiApiToken.trim()) return true;
-  } catch {
-    // ignore and handle as missing token
+export type EnsureOpenAiTokenConfiguredError = 'missing-token' | 'storage-error';
+
+export async function ensureOpenAiTokenConfigured(
+  deps: TokenGuardDeps,
+): Result.ResultAsync<void, EnsureOpenAiTokenConfiguredError> {
+  const tokenResult = Result.pipe(
+    Result.try({
+      immediate: true,
+      try: () => deps.storageLocalGet(['openaiApiToken']),
+      catch: () => 'storage-error' as const,
+    }),
+    Result.map(data => (data as LocalStorageData).openaiApiToken ?? ''),
+    Result.andThen(token => (token.trim() ? Result.succeed() : Result.fail('missing-token' as const))),
+  );
+
+  const tokenConfigured = await tokenResult;
+
+  if (Result.isSuccess(tokenConfigured)) {
+    return tokenConfigured;
   }
 
   deps.showNotification('OpenAI API Tokenが未設定です。「設定」タブで保存してください。', 'error');
   deps.navigateToPane('pane-settings');
   deps.focusTokenInput();
-  return false;
+  return tokenConfigured;
 }
