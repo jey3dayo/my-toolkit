@@ -111,6 +111,7 @@
 :host(#my-browser-utils-overlay) {
   top: 16px;
   left: 16px;
+  --toast-surface-inset: auto 12px 12px 12px;
 }
 
 :host,
@@ -156,6 +157,7 @@
 .mbu-toast-viewport[data-placement="surface"] {
   position: absolute;
   inset: var(--toast-surface-inset, 12px 12px auto auto);
+  align-items: center;
 }
 
 .mbu-toast-viewport[data-placement="surface"] .mbu-toast-root {
