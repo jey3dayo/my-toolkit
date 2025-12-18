@@ -3,3 +3,6 @@ dist/
 npm-debug.log*
 .DS_Store
 .tmp/
+
+*storybook.log
+storybook-static

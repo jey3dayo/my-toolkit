@@ -1,0 +1,34 @@
+import type { Preview } from '@storybook/react-vite';
+import { ensurePopupUiBaseStyles } from '../src/ui/styles';
+
+import '../popup.css';
+
+const preview: Preview = {
+  parameters: {
+    controls: {
+      matchers: {
+        color: /(background|color)$/i,
+        date: /Date$/i,
+      },
+    },
+    a11y: {
+      // 'todo' - show a11y violations in the test UI only
+      // 'error' - fail CI on a11y violations
+      // 'off' - skip a11y checks entirely
+      test: 'todo',
+    },
+  },
+  decorators: [
+    Story => {
+      ensurePopupUiBaseStyles(document);
+      document.body.classList.add('is-extension');
+      return (
+        <div className="mbu-surface" style={{ minHeight: '100vh', padding: 16 }}>
+          <Story />
+        </div>
+      );
+    },
+  ],
+};
+
+export default preview;

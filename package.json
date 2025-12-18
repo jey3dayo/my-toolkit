@@ -6,18 +6,25 @@
   "directories": {
     "doc": "docs"
   },
+  "engines": {
+    "node": "24.8.0"
+  },
   "scripts": {
     "build": "pnpm run clean && pnpm run typecheck && pnpm run bundle",
     "bundle": "esbuild src/background.ts src/content.ts src/popup.ts --bundle --format=iife --platform=browser --target=es2020 --define:process.env.NODE_ENV=\\\"production\\\" --outdir=dist --sourcemap",
     "typecheck": "tsc --noEmit",
     "watch": "pnpm run bundle --watch",
     "clean": "rm -rf dist",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run --project=unit",
+    "test:watch": "vitest --project=unit",
+    "test:storybook": "vitest run --project=storybook",
+    "test-storybook": "pnpm run test:storybook",
     "format": "ultracite fix",
     "lint": "ultracite check",
     "lint:fix": "ultracite fix",
-    "doctor": "ultracite doctor"
+    "doctor": "ultracite doctor",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "keywords": [],
   "author": "",
@@ -39,7 +46,16 @@
     "jsdom": "^27.3.0",
     "typescript": "^5.9.3",
     "ultracite": "6.4.2",
-    "vitest": "^4.0.15"
+    "vitest": "^4.0.16",
+    "storybook": "^10.1.10",
+    "@storybook/react-vite": "^10.1.10",
+    "@chromatic-com/storybook": "^4.1.3",
+    "@storybook/addon-vitest": "^10.1.10",
+    "@storybook/addon-a11y": "^10.1.10",
+    "@storybook/addon-docs": "^10.1.10",
+    "playwright": "^1.57.0",
+    "@vitest/browser-playwright": "^4.0.16",
+    "@vitest/coverage-v8": "^4.0.16"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

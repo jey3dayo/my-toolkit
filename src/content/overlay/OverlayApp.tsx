@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AuxTextDisclosure } from '../../components/AuxTextDisclosure';
 import type { ExtractedEvent, SummarySource } from '../../shared_types';
 import { createNotifications, ToastHost } from '../../ui/toast';
+import { CopyIcon, PinIcon } from './icons';
 
 export type OverlayViewModel = {
   open: boolean;
@@ -228,10 +229,7 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
               title={pinned ? '固定解除' : '固定'}
               type="button"
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
+              <PinIcon />
             </button>
             <button
               aria-label="閉じる"
@@ -264,10 +262,7 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
                 title="コピー"
                 type="button"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                  <rect height="13" rx="2" width="13" x="9" y="9" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
+                <CopyIcon />
               </button>
             </div>
           ) : null}
@@ -316,10 +311,7 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
                   title="コピー"
                   type="button"
                 >
-                  <svg aria-hidden="true" viewBox="0 0 24 24">
-                    <rect height="13" rx="2" width="13" x="9" y="9" />
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                  </svg>
+                  <CopyIcon />
                 </button>
                 <pre className="mbu-overlay-primary-text">{props.viewModel.primary}</pre>
               </div>
