@@ -1,125 +1,129 @@
 # My Browser Utils
 
-個人用のブラウザユーティリティChrome拡張機能
+個人用の Chrome 拡張（Manifest V3）です。バックエンドなしで、普段使う Web ページ上の「ちょっと便利」を追加します。
+
+主な機能:
+
+- テーブルをクリックでソート（動的に追加されるテーブルも対応）
+- OpenAI を使った「Context Actions」（要約/翻訳/カレンダー抽出）をポップアップと右クリックから実行
 
 ## 機能
 
-### 1. テーブルソート機能
+### テーブルソート
 
-- ✅ Webページ上のテーブルをクリックでソート
-- ✅ 数値・文字列の自動判定
-- ✅ 昇順・降順の切り替え
-- ✅ **ドメインパターン登録で自動有効化**
-- ✅ **動的に追加されるテーブルも自動検知（MutationObserver）**
+- `<th>` ヘッダーをクリックでソート（昇順/降順をトグル）
+- 数値/文字列を自動判定
+- 自動有効化:
+  - すべてのサイトで有効化、または
+  - URL パターンに一致するサイトだけ自動有効化（`*` ワイルドカード対応 / protocol は無視）
+- `MutationObserver` で新しく挿入されたテーブルも自動検出
 
-### 2. AI連携（開発中）
+### Context Actions（OpenAI 連携）
 
-- 範囲選択したテキストをAIで処理
-- 右クリックメニューから実行
+- 実行方法:
+  - ポップアップ → **アクション** タブ、または
+  - 右クリック → **My Browser Utils** → アクション
+- 組み込みアクション:
+  - **要約**（日本語）
+  - **日本語に翻訳**
+  - **カレンダー登録する**（イベント抽出 → Google カレンダーリンク + `.ics`）
+- カスタムアクション:
+  - ポップアップで作成/編集/削除/リセット可能
+  - テンプレ変数: `{{text}}` / `{{title}}` / `{{url}}` / `{{source}}`
+- 結果表示:
+  - ポップアップの出力パネル（コピー / カレンダーを開く / `.ics` ダウンロード）
+  - 右クリック実行時はページ上にオーバーレイ表示（コピー / 固定 / ドラッグ / カレンダー / `.ics`）
 
-## インストール方法
+詳細は `docs/context-actions.md` を参照してください。
 
-1. Chrome で `chrome://extensions/` を開く
-2. 「デベロッパーモード」を有効化
-3. 依存関係をインストールしてビルドする
+## インストール（パッケージ化されていない拡張機能）
+
+1. 依存関係インストール + ビルド:
    - `pnpm install`
    - `pnpm run build`（`dist/` を生成）
-4. 「パッケージ化されていない拡張機能を読み込む」をクリック
-5. このフォルダ（`my-browser-utils`）を選択
+2. Chrome で `chrome://extensions/` を開く
+3. **デベロッパーモード** を有効化
+4. **パッケージ化されていない拡張機能を読み込む** をクリックし、`my-browser-utils` フォルダを選択
 
 ## 使い方
 
 ### テーブルソート
 
-#### 方法1: ドメインパターン登録（推奨）
+ポップアップ → **テーブルソート** タブ:
 
-1. 拡張機能アイコンをクリック
-2. 「ドメインパターン登録」セクションでパターンを入力
-   - 例: `*.moneyforward.com/bs/*`
-   - 例: `example.com/path/*`
-3. 「追加」ボタンをクリック
-4. 登録したパターンのページを開くと自動的にソート有効化
+- **このタブで有効化**: 現在のタブで即時有効化
+- **自動で有効化する**: 自動有効化の ON/OFF
+- **URL パターン**: 例
+  - `*.moneyforward.com/bs/*`
+  - `example.com/path*`
 
-#### 方法2: 手動有効化
+### Context Actions
 
-1. 拡張機能アイコンをクリック
-2. 「テーブルソート有効化」ボタンをクリック
-3. ページ上のテーブルヘッダーをクリックしてソート
+- ポップアップ（**アクション** タブ）から実行: 選択範囲 → 直近の選択キャッシュ（約30秒）→ ページ本文の順にフォールバックします
+- 右クリックから実行: 右クリックメニュー → **My Browser Utils** → アクション
 
-#### 方法3: グローバル自動有効化
+## 設定
 
-設定で「自動でテーブルソートを有効化」をONにすると、すべてのサイトで自動有効化されます
+ポップアップ → **設定** タブ:
 
-### AI連携（開発中）
-
-1. テキストを範囲選択
-2. 右クリック
-3. 「選択テキストをAIで処理」を選択
-
-## プロジェクト構造
-
-```
-my-browser-utils/
-├── .claude/
-│   └── rules/          # 開発ルール（Claude Code用）
-├── dist/               # tscの出力先（自動生成）
-├── docs/               # プロジェクトドキュメント
-│   └── icon-setup.md   # アイコン作成ガイド
-├── icons/              # 拡張機能アイコン
-├── images/             # ポップアップUI用画像
-├── manifest.json       # 拡張機能マニフェスト
-├── src/                # TypeScriptソース
-│   ├── background.ts   # バックグラウンドスクリプト
-│   ├── content.ts      # コンテンツスクリプト
-│   └── popup.ts        # ポップアップロジック
-├── content.css         # コンテンツスクリプト用スタイル
-├── popup.html          # ポップアップUI
-└── src/styles/         # ポップアップ/共通UIスタイル（Design Tokens）
-    ├── base.css
-    ├── layout.css
-    ├── utilities.css
-    └── tokens/
-        ├── primitives.css
-        ├── semantic.css
-        └── components.css
-```
+- OpenAI API Token（`chrome.storage.local` に保存。同期されません）
+- モデル選択（デフォルト `gpt-4o-mini` / `gpt-4o`）
+- 追加指示（任意。出力の口調やフォーマットの好みに）
+- テーマ（ダーク/ライト。ポップアップと注入 UI に反映）
 
 ## 開発
 
-### 開発ルール
+### 必要要件
 
-`.claude/rules/development.md` を参照してください。
+- Node `24.8.0`
+- pnpm `10.26.0`
+- `mise`（任意・推奨。ツールバージョンを揃えるため）
 
-### スタイル管理
+### コマンド
 
-Design Tokens とテーマ切り替えの方針は `docs/style-management.md` を参照してください。
+基本は `mise` タスクを使います:
 
-### アイコン更新
+- `mise run format`（Ultracite/Biome による自動整形）
+- `mise run lint`（型チェック + Lint）
+- `mise run test`（Vitest ユニットテスト）
+- `mise run test:storybook`（Storybook/Vitest addon のテスト）
+- `mise run build`（`dist/` へバンドル）
+- `mise run ci`（format + lint + test + storybook test + build）
 
-詳細は `docs/icon-setup.md` を参照してください。
+その他:
 
-```bash
-# 透過アイコン生成（ImageMagick必要）
-magick images/logo.png -fuzz 10% -transparent white -resize 16x16 icons/icon16.png
-magick images/logo.png -fuzz 10% -transparent white -resize 48x48 icons/icon48.png
-magick images/logo.png -fuzz 10% -transparent white -resize 128x128 icons/icon128.png
+- `pnpm run watch`（bundle の watch）
+- `pnpm run storybook`（`http://localhost:6006`）
+
+## プロジェクト構成
+
+```
+my-browser-utils/
+├── dist/                      # bundle 出力（生成物）
+├── docs/                      # ドキュメント
+│   ├── context-actions.md     # Context Actions ガイド
+│   ├── icon-setup.md          # アイコン作成手順
+│   └── style-management.md    # Design Tokens / テーマ
+├── manifest.json              # 拡張機能マニフェスト（MV3）
+├── popup.html                 # ポップアップのエントリ（popup_bootstrap.js 経由で dist/popup.js を読む）
+├── src/
+│   ├── background.ts          # service worker（コンテキストメニュー + OpenAI 呼び出し）
+│   ├── content.ts             # content script（テーブルソート + オーバーレイ + 選択キャッシュ）
+│   ├── popup.ts               # ポップアップ（React root）
+│   ├── popup/                 # ポップアップ UI（React + Base UI）
+│   ├── content/overlay/       # オーバーレイ UI（React + Base UI / Shadow DOM）
+│   ├── openai/                # OpenAI 設定
+│   └── ui/                    # 共通 UI（theme/styles/toast）
+└── tests/                     # Vitest（jsdom + chrome stubs）
 ```
 
-### 拡張機能のリロード
+## プライバシー/セキュリティ
 
-Chrome拡張機能ページ（`chrome://extensions/`）で「更新」ボタンをクリック
+- OpenAI API Token は `chrome.storage.local` に保存（同期なし）
+- URL パターン/アクション定義などの非機密設定は `chrome.storage.sync` に保存
+- 選択テキストは安定動作のためローカルに短時間キャッシュされることがあります（fresh 判定は約30秒）
+- OpenAI への送信は **Context Action を明示的に実行した場合のみ** 発生します
 
-### ビルド
+## ライセンス
 
-```bash
-pnpm install
-pnpm run build   # dist/ にコンパイル
-# 開発時の監視
-pnpm run watch
-```
-
-## TODO
-
-- [ ] AI API連携の実装
-- [ ] テスト自動化
-- [ ] Chromeウェブストア公開準備
+ISC

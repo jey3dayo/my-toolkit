@@ -32,7 +32,7 @@ Implementation:
 - `src/ui/theme.ts` exports `applyTheme()` and `Theme`
 - `src/popup.ts` loads the stored theme (defaults to `auto`) and applies it at startup
 - `src/popup/panes/SettingsPane.tsx` provides an Auto/Dark/Light selector and persists it to `chrome.storage.local`
-- `src/content.ts` loads the stored theme (defaults to `auto`) and applies it to injected ShadowRoot surfaces
+- `src/content.ts` loads the stored theme (defaults to `auto`) and applies it to injected ShadowRoot surfaces (overlay + toasts)
 
 ## Stylesheet Layout
 
