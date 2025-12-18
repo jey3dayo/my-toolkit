@@ -2,25 +2,12 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
-import type { Notifier } from '../../ui/toast';
-import type { PopupRuntime, RunContextActionRequest } from '../runtime';
+import type { RunContextActionRequest } from '../runtime';
 import { createStoryPopupRuntime } from '../storybook/createStoryPopupRuntime';
-import { ActionsPane } from './ActionsPane';
+import { ActionsPane, type ActionsPaneProps } from './ActionsPane';
 
-function ActionsPaneStory(props: {
-  runtime: PopupRuntime;
-  notify: Notifier;
-  navigateToPane: (paneId: string) => void;
-  focusTokenInput: () => void;
-}): React.JSX.Element {
-  return (
-    <ActionsPane
-      focusTokenInput={props.focusTokenInput}
-      navigateToPane={paneId => props.navigateToPane(paneId)}
-      notify={props.notify}
-      runtime={props.runtime}
-    />
-  );
+function ActionsPaneStory(props: ActionsPaneProps): React.JSX.Element {
+  return <ActionsPane {...props} />;
 }
 
 const meta = {

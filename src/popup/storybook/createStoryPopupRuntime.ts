@@ -11,62 +11,60 @@ type Options = {
   };
 };
 
+type InMemoryStorageArea<T extends Record<string, unknown>> = {
+  get: (keys: (keyof T)[]) => Promise<Partial<T>>;
+  set: (items: Partial<T>) => Promise<void>;
+  remove: (keys: (keyof T)[] | keyof T) => Promise<void>;
+};
+
+function createInMemoryStorageArea<T extends Record<string, unknown>>(initial?: Partial<T>): InMemoryStorageArea<T> {
+  const data = new Map<string, unknown>(Object.entries(initial ?? {}));
+
+  return {
+    get: async keys => {
+      const result: Partial<T> = {};
+      for (const key of keys) {
+        const stored = data.get(String(key));
+        if (typeof stored === 'undefined') continue;
+        (result as Record<string, unknown>)[String(key)] = stored;
+      }
+      return result;
+    },
+    set: async items => {
+      for (const [key, value] of Object.entries(items)) {
+        if (typeof value === 'undefined') continue;
+        data.set(key, value);
+      }
+    },
+    remove: async keys => {
+      const list = Array.isArray(keys) ? keys : [keys];
+      for (const key of list) {
+        data.delete(String(key));
+      }
+    },
+  };
+}
+
+function getMessageAction(message: unknown): unknown {
+  if (typeof message !== 'object' || message === null) return null;
+  return (message as { action?: unknown }).action ?? null;
+}
+
 export function createStoryPopupRuntime(options: Options = {}): PopupRuntime {
-  const syncStorage = new Map<string, unknown>(Object.entries(options.sync ?? {}));
-  const localStorage = new Map<string, unknown>(Object.entries(options.local ?? {}));
   const activeTabId = options.activeTabId ?? 123;
-
-  const storageSyncGet: PopupRuntime['storageSyncGet'] = async keys => {
-    const result: Partial<SyncStorageData> = {};
-    keys.forEach(key => {
-      if (syncStorage.has(String(key))) {
-        (result as Record<string, unknown>)[key] = syncStorage.get(String(key));
-      }
-    });
-    return result;
-  };
-
-  const storageSyncSet: PopupRuntime['storageSyncSet'] = async items => {
-    Object.entries(items).forEach(([key, value]) => {
-      if (typeof value === 'undefined') return;
-      syncStorage.set(key, value);
-    });
-  };
-
-  const storageLocalGet: PopupRuntime['storageLocalGet'] = async keys => {
-    const result: Partial<LocalStorageData> = {};
-    keys.forEach(key => {
-      if (localStorage.has(String(key))) {
-        (result as Record<string, unknown>)[key] = localStorage.get(String(key));
-      }
-    });
-    return result;
-  };
-
-  const storageLocalSet: PopupRuntime['storageLocalSet'] = async items => {
-    Object.entries(items).forEach(([key, value]) => {
-      if (typeof value === 'undefined') return;
-      localStorage.set(key, value);
-    });
-  };
-
-  const storageLocalRemove: PopupRuntime['storageLocalRemove'] = async keys => {
-    const list = Array.isArray(keys) ? keys : [keys];
-    list.forEach(key => {
-      localStorage.delete(String(key));
-    });
-  };
+  const sync = createInMemoryStorageArea<SyncStorageData>(options.sync);
+  const local = createInMemoryStorageArea<LocalStorageData>(options.local);
 
   return {
     isExtensionPage: false,
-    storageSyncGet,
-    storageSyncSet,
-    storageLocalGet,
-    storageLocalSet,
-    storageLocalRemove,
+    storageSyncGet: sync.get,
+    storageSyncSet: sync.set,
+    storageLocalGet: local.get,
+    storageLocalSet: local.set,
+    storageLocalRemove: local.remove,
     getActiveTabId: async () => activeTabId,
     sendMessageToBackground: async message => {
-      const action = typeof message === 'object' && message !== null ? (message as { action?: unknown }).action : null;
+      const action = getMessageAction(message);
 
       if (action === 'testOpenAiToken') {
         if (options.background?.testOpenAiToken) {
@@ -87,7 +85,9 @@ export function createStoryPopupRuntime(options: Options = {}): PopupRuntime {
     sendMessageToTab: async () => ({ success: true }) as never,
     openUrl: url => {
       try {
-        window.open(url, '_blank', 'noopener,noreferrer');
+        const trimmed = url.trim();
+        if (!trimmed) return;
+        window.open(trimmed, '_blank', 'noopener,noreferrer');
       } catch {
         // no-op
       }

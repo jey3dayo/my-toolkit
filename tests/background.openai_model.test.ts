@@ -1,76 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flush } from './helpers/async';
-
-type ChromeStub = {
-  runtime: {
-    lastError: { message: string } | null;
-    onInstalled: { addListener: ReturnType<typeof vi.fn> };
-    onStartup: { addListener: ReturnType<typeof vi.fn> };
-    onMessage: { addListener: ReturnType<typeof vi.fn> };
-  };
-  storage: {
-    local: { get: ReturnType<typeof vi.fn> };
-    sync: { get: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn> };
-    onChanged: { addListener: ReturnType<typeof vi.fn> };
-  };
-  contextMenus: {
-    removeAll: ReturnType<typeof vi.fn>;
-    create: ReturnType<typeof vi.fn>;
-    onClicked: { addListener: ReturnType<typeof vi.fn> };
-  };
-  tabs: { sendMessage: ReturnType<typeof vi.fn> };
-};
-
-function createChromeStub(listeners: Array<(...args: unknown[]) => unknown>): ChromeStub {
-  const runtime = {
-    lastError: null as { message: string } | null,
-    onInstalled: { addListener: vi.fn() },
-    onStartup: { addListener: vi.fn() },
-    onMessage: {
-      addListener: vi.fn((listener: (...args: unknown[]) => unknown) => {
-        listeners.push(listener);
-      }),
-    },
-  };
-
-  return {
-    runtime,
-    storage: {
-      local: {
-        get: vi.fn(),
-      },
-      sync: {
-        get: vi.fn((_keys: unknown, callback: (items: unknown) => void) => {
-          runtime.lastError = null;
-          callback({});
-        }),
-        set: vi.fn((_items: unknown, callback: () => void) => {
-          runtime.lastError = null;
-          callback();
-        }),
-      },
-      onChanged: {
-        addListener: vi.fn(),
-      },
-    },
-    contextMenus: {
-      removeAll: vi.fn((callback: () => void) => {
-        runtime.lastError = null;
-        callback();
-      }),
-      create: vi.fn((_createProperties: unknown, callback: () => void) => {
-        runtime.lastError = null;
-        callback();
-      }),
-      onClicked: {
-        addListener: vi.fn(),
-      },
-    },
-    tabs: {
-      sendMessage: vi.fn(),
-    },
-  };
-}
+import { type ChromeStub, createChromeStub } from './helpers/chromeStub';
 
 describe('background: OpenAI model selection', () => {
   let listeners: Array<(...args: unknown[]) => unknown>;
@@ -79,7 +9,7 @@ describe('background: OpenAI model selection', () => {
   beforeEach(async () => {
     vi.resetModules();
     listeners = [];
-    chromeStub = createChromeStub(listeners);
+    chromeStub = createChromeStub({ listeners });
 
     chromeStub.storage.local.get.mockImplementation((keys: string[], callback: (items: unknown) => void) => {
       chromeStub.runtime.lastError = null;

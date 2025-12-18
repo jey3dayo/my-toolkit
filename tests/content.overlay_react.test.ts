@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flush } from './helpers/async';
+import { type ChromeStub, createChromeStub } from './helpers/chromeStub';
 
 type ContentRequest =
   | {
@@ -31,50 +32,6 @@ type ContentRequest =
     }
   | { action: 'enableTableSort' };
 
-type ChromeStub = {
-  runtime: {
-    lastError: { message: string } | null;
-    onMessage: {
-      addListener: ReturnType<typeof vi.fn>;
-    };
-    sendMessage: ReturnType<typeof vi.fn>;
-  };
-  storage: {
-    sync: {
-      get: ReturnType<typeof vi.fn>;
-    };
-    local: {
-      get: ReturnType<typeof vi.fn>;
-      set: ReturnType<typeof vi.fn>;
-    };
-  };
-};
-
-function createChromeStub(listeners: Array<(...args: unknown[]) => unknown>): ChromeStub {
-  const runtime = {
-    lastError: null as { message: string } | null,
-    onMessage: {
-      addListener: vi.fn((listener: (...args: unknown[]) => unknown) => {
-        listeners.push(listener);
-      }),
-    },
-    sendMessage: vi.fn((_message: unknown, callback: (resp: unknown) => void) => callback({ ok: true })),
-  };
-
-  return {
-    runtime,
-    storage: {
-      sync: {
-        get: vi.fn((_keys: string[], callback: (items: unknown) => void) => callback({})),
-      },
-      local: {
-        get: vi.fn((_keys: string[], callback: (items: unknown) => void) => callback({})),
-        set: vi.fn((_items: Record<string, unknown>, callback: () => void) => callback()),
-      },
-    },
-  };
-}
-
 async function dispatchMessage(
   listener: (...args: unknown[]) => unknown,
   request: ContentRequest,
@@ -96,7 +53,7 @@ describe('content overlay (React + Shadow DOM)', () => {
 
     dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://example.com/' });
     listeners = [];
-    chromeStub = createChromeStub(listeners);
+    chromeStub = createChromeStub({ listeners });
 
     Object.defineProperty(dom.window.navigator, 'clipboard', {
       configurable: true,

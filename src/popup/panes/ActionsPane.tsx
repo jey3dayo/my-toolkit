@@ -30,7 +30,7 @@ type OutputState =
     }
   | { status: 'error'; title: string; message: string };
 
-type Props = {
+export type ActionsPaneProps = {
   runtime: PopupRuntime;
   notify: Notifier;
   navigateToPane: (paneId: PaneId) => void;
@@ -65,7 +65,7 @@ function coerceExtractedEvent(value: unknown): ExtractedEvent | null {
   return { title, start, end, allDay, location, description };
 }
 
-export function ActionsPane(props: Props): React.JSX.Element {
+export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
   const [actions, setActions] = useState<ContextAction[]>([]);
   const [output, setOutput] = useState<OutputState>({ status: 'idle' });
   const [editorId, setEditorId] = useState<string>('');
