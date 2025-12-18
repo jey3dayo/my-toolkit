@@ -12,7 +12,15 @@ const config: StorybookConfig = {
     config.optimizeDeps ??= {};
     const include = Array.isArray(config.optimizeDeps.include) ? config.optimizeDeps.include : [];
     config.optimizeDeps.include = Array.from(
-      new Set([...include, 'date-fns', '@base-ui/react/button', '@base-ui/react/input']),
+      new Set([
+        ...include,
+        'date-fns',
+        'react-dom',
+        'react-dom/client',
+        '@base-ui/react/button',
+        '@base-ui/react/input',
+        '@base-ui/react/toast',
+      ]),
     );
     return config;
   },
