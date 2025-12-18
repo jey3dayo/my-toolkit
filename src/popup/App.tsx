@@ -150,10 +150,7 @@ export function PopupApp(): React.JSX.Element {
                 value="pane-create-link"
               >
                 <span aria-hidden="true" className="nav-icon">
-                  <svg aria-hidden="true" viewBox="0 0 24 24">
-                    <path d="M10 13a5 5 0 0 0 7.07 0l1.41-1.41a5 5 0 0 0 0-7.07a5 5 0 0 0-7.07 0L10 5.93" />
-                    <path d="M14 11a5 5 0 0 0-7.07 0L5.52 12.41a5 5 0 0 0 0 7.07a5 5 0 0 0 7.07 0L14 18.07" />
-                  </svg>
+                  <Icon aria-hidden="true" name="link" />
                 </span>
                 <span className="nav-label">リンク作成</span>
               </Tabs.Tab>
@@ -210,10 +207,7 @@ export function PopupApp(): React.JSX.Element {
                     type="button"
                   >
                     <span aria-hidden="true" className="menu-icon">
-                      <svg aria-hidden="true" viewBox="0 0 24 24">
-                        <path d="M10 13a5 5 0 0 0 7.07 0l1.41-1.41a5 5 0 0 0 0-7.07a5 5 0 0 0-7.07 0L10 5.93" />
-                        <path d="M14 11a5 5 0 0 0-7.07 0L5.52 12.41a5 5 0 0 0 0 7.07a5 5 0 0 0 7.07 0L14 18.07" />
-                      </svg>
+                      <Icon aria-hidden="true" name="link" />
                     </span>
                     リンク作成
                   </Button>
