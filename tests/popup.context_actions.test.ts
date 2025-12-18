@@ -1,5 +1,8 @@
 import { JSDOM } from 'jsdom';
+import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 type ChromeStub = {
   runtime: {
@@ -19,51 +22,20 @@ type ChromeStub = {
   };
   tabs: {
     query: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
   };
 };
 
-function createPopupDom(): JSDOM {
+function createPopupDom(url = 'chrome-extension://test/popup.html#pane-actions'): JSDOM {
   const html = `<!doctype html>
   <html lang="ja">
-    <body class="no-js">
-      <main class="content">
-        <header class="content-header">
-          <span id="hero-chip">-</span>
-          <button id="cta-pill" type="button"></button>
-        </header>
-        <div class="content-body">
-          <section class="pane active" id="pane-actions" role="tabpanel">
-            <span id="action-source-chip">-</span>
-            <div id="action-buttons"></div>
-            <h3 id="action-output-title">結果</h3>
-            <textarea id="action-output"></textarea>
-            <button id="copy-action-output" disabled>コピー</button>
-            <button id="open-calendar" hidden>Googleカレンダー</button>
-            <button id="download-ics" hidden>.ics</button>
-          </section>
-          <section class="pane" id="pane-table" role="tabpanel"></section>
-          <section class="pane" id="pane-settings" role="tabpanel">
-            <input type="password" id="openai-token" />
-          </section>
-        </div>
-      </main>
-      <div id="menu-scrim"></div>
-      <aside id="menu-drawer">
-        <button id="menu-close" type="button">close</button>
-        <a class="menu-item" data-target="pane-actions" href="#pane-actions"></a>
-        <a class="menu-item" data-target="pane-table" href="#pane-table"></a>
-        <a class="menu-item" data-target="pane-settings" href="#pane-settings"></a>
-      </aside>
-      <aside class="sidebar">
-        <button id="sidebar-toggle" type="button" aria-label="メニューを切り替え" aria-pressed="false">toggle</button>
-        <a class="nav-item active" data-target="pane-actions" href="#pane-actions" role="tab"></a>
-        <a class="nav-item" data-target="pane-table" href="#pane-table" role="tab"></a>
-        <a class="nav-item" data-target="pane-settings" href="#pane-settings" role="tab"></a>
-      </aside>
+    <head></head>
+    <body>
+      <div id="root"></div>
     </body>
   </html>`;
 
-  return new JSDOM(html, { url: 'chrome-extension://test/popup.html#pane-actions' });
+  return new JSDOM(html, { url });
 }
 
 function createChromeStub(overrides?: Partial<ChromeStub>): ChromeStub {
@@ -96,6 +68,7 @@ function createChromeStub(overrides?: Partial<ChromeStub>): ChromeStub {
     },
     tabs: {
       query: vi.fn(),
+      create: vi.fn(),
     },
   };
 
@@ -108,7 +81,7 @@ async function flush(window: Window, times = 5): Promise<void> {
   }
 }
 
-describe('popup context actions (src/popup.ts)', () => {
+describe('popup context actions (React UI)', () => {
   let dom: JSDOM;
   let chromeStub: ChromeStub;
 
@@ -123,19 +96,8 @@ describe('popup context actions (src/popup.ts)', () => {
       const keyList = Array.isArray(keys) ? keys : [String(keys)];
       if (keyList.includes('contextActions')) {
         callback({
-          contextActions: [
-            { id: 'builtin:summarize', title: '要約', kind: 'text', prompt: '{{text}}' },
-            { id: 'builtin:calendar', title: 'カレンダー登録する', kind: 'event', prompt: '' },
-          ],
+          contextActions: [{ id: 'builtin:summarize', title: '要約', kind: 'text', prompt: '{{text}}' }],
         });
-        return;
-      }
-      if (keyList.includes('autoEnableSort')) {
-        callback({ autoEnableSort: false });
-        return;
-      }
-      if (keyList.includes('domainPatterns')) {
-        callback({ domainPatterns: [] });
         return;
       }
       callback({});
@@ -148,16 +110,12 @@ describe('popup context actions (src/popup.ts)', () => {
         callback({ openaiApiToken: 'sk-test' });
         return;
       }
-      if (keyList.includes('openaiCustomPrompt')) {
-        callback({ openaiCustomPrompt: '' });
-        return;
-      }
       callback({});
     });
 
-    chromeStub.tabs.query.mockImplementation((queryInfo: unknown, callback: (tabs: unknown[]) => void) => {
+    chromeStub.tabs.query.mockImplementation((_queryInfo: unknown, callback: (tabs: unknown[]) => void) => {
       chromeStub.runtime.lastError = null;
-      callback([{ id: 1, queryInfo }]);
+      callback([{ id: 1 }]);
     });
 
     chromeStub.runtime.sendMessage.mockImplementation((message: unknown, callback: (resp: unknown) => void) => {
@@ -175,29 +133,90 @@ describe('popup context actions (src/popup.ts)', () => {
     vi.stubGlobal('navigator', dom.window.navigator);
     vi.stubGlobal('chrome', chromeStub);
 
-    await import('../src/popup.ts');
-    await flush(dom.window);
+    Object.defineProperty(dom.window.navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: vi.fn(async () => undefined),
+      },
+    });
+
+    await act(async () => {
+      await import('../src/popup.ts');
+      await flush(dom.window);
+    });
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('runs builtin:summarize and renders the result', async () => {
+  it('runs builtin:summarize and renders the result + source', async () => {
     const button = dom.window.document.querySelector<HTMLButtonElement>('button[data-action-id="builtin:summarize"]');
-    expect(button?.textContent).toBe('要約');
+    expect(button?.textContent).toContain('要約');
 
-    button?.click();
-    await flush(dom.window);
+    await act(async () => {
+      button?.click();
+      await flush(dom.window);
+    });
 
-    expect(dom.window.document.getElementById('action-output-title')?.textContent).toBe('要約');
-    expect((dom.window.document.getElementById('action-output') as HTMLTextAreaElement | null)?.value).toBe('summary');
-    expect((dom.window.document.getElementById('copy-action-output') as HTMLButtonElement | null)?.disabled).toBe(
-      false,
-    );
-    expect(dom.window.document.getElementById('action-source-chip')?.textContent).toBe('選択範囲');
+    const output = dom.window.document.querySelector<HTMLTextAreaElement>('[data-testid="action-output"]');
+    expect(output?.value).toBe('summary');
+
+    const source = dom.window.document.querySelector('[data-testid="action-source"]');
+    expect(source?.textContent).toBe('選択範囲');
 
     expect(chromeStub.runtime.sendMessage).toHaveBeenCalled();
+  });
+
+  it('renders template variable hints', () => {
+    const hints = dom.window.document.querySelector('[data-testid="template-vars"]');
+    expect(hints?.textContent).toContain('{{text}}');
+    expect(hints?.textContent).toContain('{{title}}');
+    expect(hints?.textContent).toContain('{{url}}');
+    expect(hints?.textContent).toContain('{{source}}');
+  });
+
+  it('copies output text to clipboard and shows a success toast', async () => {
+    const button = dom.window.document.querySelector<HTMLButtonElement>('button[data-action-id="builtin:summarize"]');
+    await act(async () => {
+      button?.click();
+      await flush(dom.window);
+    });
+
+    const copyButton = dom.window.document.querySelector<HTMLButtonElement>('[data-testid="copy-output"]');
+    expect(copyButton).not.toBeNull();
+
+    await act(async () => {
+      copyButton?.click();
+      await flush(dom.window);
+    });
+
+    const clipboard = dom.window.navigator.clipboard as unknown as { writeText: ReturnType<typeof vi.fn> };
+    expect(clipboard.writeText).toHaveBeenCalledWith('summary');
+    expect(dom.window.document.body.textContent).toContain('コピーしました');
+  });
+
+  it('shows an error toast when clipboard write fails and keeps output intact', async () => {
+    const clipboard = dom.window.navigator.clipboard as unknown as { writeText: ReturnType<typeof vi.fn> };
+    clipboard.writeText.mockRejectedValueOnce(new Error('denied'));
+
+    const button = dom.window.document.querySelector<HTMLButtonElement>('button[data-action-id="builtin:summarize"]');
+    await act(async () => {
+      button?.click();
+      await flush(dom.window);
+    });
+
+    const output = dom.window.document.querySelector<HTMLTextAreaElement>('[data-testid="action-output"]');
+    expect(output?.value).toBe('summary');
+
+    const copyButton = dom.window.document.querySelector<HTMLButtonElement>('[data-testid="copy-output"]');
+    await act(async () => {
+      copyButton?.click();
+      await flush(dom.window);
+    });
+
+    expect(dom.window.document.body.textContent).toContain('コピーに失敗しました');
+    expect(output?.value).toBe('summary');
   });
 
   it('does not crash when background returns an invalid response', async () => {
@@ -207,9 +226,12 @@ describe('popup context actions (src/popup.ts)', () => {
     });
 
     const button = dom.window.document.querySelector<HTMLButtonElement>('button[data-action-id="builtin:summarize"]');
-    button?.click();
-    await flush(dom.window);
+    await act(async () => {
+      button?.click();
+      await flush(dom.window);
+    });
 
-    expect((dom.window.document.getElementById('action-output') as HTMLTextAreaElement | null)?.value).toBe('');
+    const output = dom.window.document.querySelector<HTMLTextAreaElement>('[data-testid="action-output"]');
+    expect(output?.value).toBe('');
   });
 });

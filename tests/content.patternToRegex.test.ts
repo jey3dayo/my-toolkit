@@ -33,6 +33,7 @@ describe('patternToRegex (src/content.ts)', () => {
   let patternToRegex: (pattern: string) => RegExp;
 
   beforeAll(async () => {
+    vi.resetModules();
     const hooks: ContentTestHooks = {};
     globalThis.__MBU_TEST_HOOKS__ = hooks;
 
@@ -49,7 +50,7 @@ describe('patternToRegex (src/content.ts)', () => {
 
   afterAll(() => {
     vi.unstubAllGlobals();
-    delete globalThis.__MBU_TEST_HOOKS__;
+    globalThis.__MBU_TEST_HOOKS__ = undefined;
   });
 
   it('allows optional trailing slash and query/hash suffix when safe', () => {

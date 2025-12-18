@@ -1,6 +1,10 @@
 // Content Script - Webページに注入される
 
-import type { SummarySource } from './shared_types';
+import { createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { OverlayApp, type OverlayViewModel } from './content/overlay/OverlayApp';
+import type { ExtractedEvent, SummarySource } from './shared_types';
+import { ensureShadowUiBaseStyles } from './ui/styles';
 
 (() => {
   type StorageData = {
@@ -28,6 +32,8 @@ import type { SummarySource } from './shared_types';
         primary?: string;
         secondary?: string;
         calendarUrl?: string;
+        ics?: string;
+        event?: ExtractedEvent;
       };
 
   type SummaryTarget = {
@@ -37,37 +43,32 @@ import type { SummarySource } from './shared_types';
     url: string;
   };
 
-  type ContentToBackgroundMessage =
-    | { action: 'summarizeText'; target: SummaryTarget }
-    | { action: 'summarizeEvent'; target: SummaryTarget };
+  const OVERLAY_HOST_ID = 'my-browser-utils-overlay';
+  const OVERLAY_ROOT_ID = 'mbu-overlay-react-root';
+  const OVERLAY_STYLE_ID = 'mbu-overlay-react-styles';
 
-  type SummarizeEventResponse =
-    | { ok: true; event: unknown; calendarUrl: string; eventText: string }
-    | { ok: false; error: string };
-
-  let tableObserver: MutationObserver | null = null;
-  let overlayEls: {
+  type OverlayMount = {
     host: HTMLDivElement;
-    title: HTMLDivElement;
-    content: HTMLDivElement;
-    primaryText: HTMLPreElement;
-    secondaryText: HTMLPreElement;
-    copyButton: HTMLButtonElement;
-    eventButton: HTMLButtonElement;
-    openCalendarButton: HTMLButtonElement;
-    copyLinkButton: HTMLButtonElement;
-    closeButton: HTMLButtonElement;
-  } | null = null;
-  let overlayCleanup: (() => void) | null = null;
-  let overlayMode: 'summary' | 'event' | 'text' = 'summary';
-  let overlaySummaryText = '';
-  let overlayEventText = '';
-  let overlayCalendarUrl = '';
-  let overlayAnchor: DOMRect | null = null;
-  let overlayPinned = false;
+    shadow: ShadowRoot;
+    root: Root;
+  };
+
+  type GlobalContentState = {
+    initialized: boolean;
+    overlayMount: OverlayMount | null;
+  };
+
+  const globalContainer = globalThis as unknown as { __MBU_CONTENT_STATE__?: GlobalContentState };
+  if (!globalContainer.__MBU_CONTENT_STATE__) {
+    globalContainer.__MBU_CONTENT_STATE__ = {
+      initialized: false,
+      overlayMount: null,
+    };
+  }
+  const globalState = globalContainer.__MBU_CONTENT_STATE__;
 
   // ========================================
-  // 1. ユーティリティ関数
+  // 1. ユーティリティ関数（URLパターン）
   // ========================================
 
   function patternToRegex(pattern: string): RegExp {
@@ -88,7 +89,6 @@ import type { SummarySource } from './shared_types';
     return patterns.some(pattern => {
       const patternWithoutProtocol = pattern.replace(/^https?:\/\//, '');
       const regex = patternToRegex(patternWithoutProtocol);
-
       return regex.test(urlWithoutProtocol);
     });
   }
@@ -99,63 +99,22 @@ import type { SummarySource } from './shared_types';
   };
 
   const testHooks = (globalThis as unknown as { __MBU_TEST_HOOKS__?: ContentTestHooks }).__MBU_TEST_HOOKS__;
-
   if (testHooks) {
     testHooks.patternToRegex = patternToRegex;
     testHooks.matchesAnyPattern = matchesAnyPattern;
   }
 
-  // ========================================
-  // 2. メッセージリスナー
-  // ========================================
-
-  chrome.runtime.onMessage.addListener(
-    (request: ContentRequest, _sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => {
-      switch (request.action) {
-        case 'enableTableSort': {
-          enableTableSort();
-          startTableObserver();
-          sendResponse({ success: true });
-          return;
-        }
-        case 'showNotification': {
-          showNotification(request.message);
-          sendResponse({ ok: true });
-          return;
-        }
-        case 'getSummaryTargetText': {
-          void (async () => {
-            try {
-              const target = await getSummaryTargetText({ ignoreSelection: request.ignoreSelection });
-              sendResponse(target);
-            } catch {
-              sendResponse({
-                text: '',
-                source: 'page',
-                title: document.title ?? '',
-                url: window.location.href,
-              } satisfies SummaryTarget);
-            }
-          })();
-          return true;
-        }
-        case 'showSummaryOverlay': {
-          showSummaryOverlay(request);
-          sendResponse({ ok: true });
-          return;
-        }
-        case 'showActionOverlay': {
-          showActionOverlay(request);
-          sendResponse({ ok: true });
-          return;
-        }
-      }
-    },
-  );
+  // 2回目以降の初期化では副作用を追加しない（idempotent）
+  if (globalState.initialized) {
+    return;
+  }
+  globalState.initialized = true;
 
   // ========================================
-  // 3. テーブルソート機能
+  // 2. テーブルソート機能
   // ========================================
+
+  let tableObserver: MutationObserver | null = null;
 
   function enableSingleTable(table: HTMLTableElement): void {
     if (table.dataset.sortable) return;
@@ -200,10 +159,10 @@ import type { SummarySource } from './shared_types';
       const aCell = a.cells[columnIndex]?.textContent?.trim() ?? '';
       const bCell = b.cells[columnIndex]?.textContent?.trim() ?? '';
 
-      const aNum = parseFloat(aCell);
-      const bNum = parseFloat(bCell);
+      const aNum = Number.parseFloat(aCell);
+      const bNum = Number.parseFloat(bCell);
 
-      if (!Number.isNaN(aNum) && !Number.isNaN(bNum)) {
+      if (!(Number.isNaN(aNum) || Number.isNaN(bNum))) {
         return isAscending ? aNum - bNum : bNum - aNum;
       }
 
@@ -214,7 +173,7 @@ import type { SummarySource } from './shared_types';
   }
 
   // ========================================
-  // 4. MutationObserver（動的テーブル検出）
+  // 3. MutationObserver（動的テーブル検出）
   // ========================================
 
   function startTableObserver(): void {
@@ -259,14 +218,14 @@ import type { SummarySource } from './shared_types';
   window.addEventListener('pagehide', stopTableObserver);
 
   // ========================================
-  // 5. UI・通知関連
+  // 4. 通知・選択範囲キャッシュ
   // ========================================
 
   document.addEventListener('mouseup', () => {
     const selectedText = window.getSelection()?.toString().trim() ?? '';
     if (selectedText) {
       void storageLocalSet({ selectedText, selectedTextUpdatedAt: Date.now() }).catch(() => {
-        // ストレージが使えない環境では黙って諦める
+        // no-op
       });
     }
   });
@@ -275,18 +234,18 @@ import type { SummarySource } from './shared_types';
     const notification = document.createElement('div');
     notification.textContent = message;
     notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #4285f4;
-    color: white;
-    padding: 12px 20px;
-    border-radius: 4px;
-    font-size: 14px;
-    z-index: 10000;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    animation: slideIn 0.3s ease-out;
-  `;
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #4285f4;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 4px;
+      font-size: 14px;
+      z-index: 10000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      animation: slideIn 0.3s ease-out;
+    `;
 
     document.body.appendChild(notification);
     window.setTimeout(() => {
@@ -299,27 +258,15 @@ import type { SummarySource } from './shared_types';
     const style = document.createElement('style');
     style.id = 'my-browser-utils-styles';
     style.textContent = `
-    @keyframes slideIn {
-      from {
-        transform: translateX(400px);
-        opacity: 0;
+      @keyframes slideIn {
+        from { transform: translateX(400px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
       }
-      to {
-        transform: translateX(0);
-        opacity: 1;
+      @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(400px); opacity: 0; }
       }
-    }
-    @keyframes slideOut {
-      from {
-        transform: translateX(0);
-        opacity: 1;
-      }
-      to {
-        transform: translateX(400px);
-        opacity: 0;
-      }
-    }
-  `;
+    `;
     document.head.appendChild(style);
   }
 
@@ -378,16 +325,310 @@ import type { SummarySource } from './shared_types';
       .trim();
   }
 
-  function ensureOverlay(): NonNullable<typeof overlayEls> {
-    if (overlayEls) return overlayEls;
+  // ========================================
+  // 5. Overlay (React + Shadow DOM)
+  // ========================================
 
-    const legacy = document.getElementById('my-browser-utils-summary');
-    if (legacy) legacy.remove();
+  const OVERLAY_CSS = `
+    :host { all: initial; }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
 
-    overlayPinned = false;
+    .mbu-overlay-panel {
+      width: min(520px, calc(100vw - 32px));
+      max-height: min(60vh, 720px);
+      background: var(--mbu-surface);
+      color: var(--mbu-text);
+      border: 1px solid var(--mbu-border);
+      border-radius: var(--mbu-radius);
+      box-shadow: var(--mbu-shadow);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
 
-    const host = document.createElement('div');
-    host.id = 'my-browser-utils-overlay';
+    .mbu-overlay-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      background: color-mix(in oklab, var(--mbu-surface-2) 75%, transparent);
+      border-bottom: 1px solid var(--mbu-border);
+    }
+
+    .mbu-overlay-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .mbu-overlay-title {
+      font-size: 13px;
+      font-weight: 750;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mbu-overlay-chip {
+      margin-left: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--mbu-border);
+      background: color-mix(in oklab, var(--mbu-surface) 60%, transparent);
+      color: var(--mbu-text-muted);
+      font-weight: 650;
+    }
+
+    .mbu-overlay-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+	    .mbu-overlay-action {
+	      appearance: none;
+	      border: 1px solid var(--mbu-border);
+	      background: color-mix(in oklab, var(--mbu-surface) 92%, transparent);
+	      color: var(--mbu-text);
+	      border-radius: 10px;
+	      height: 32px;
+	      padding: 0 10px;
+	      font-size: 12px;
+	      line-height: 1;
+	      cursor: pointer;
+	      font-weight: 700;
+	      display: inline-flex;
+	      align-items: center;
+	      justify-content: center;
+	      gap: 6px;
+	    }
+	    .mbu-overlay-action:disabled {
+	      opacity: 0.6;
+	      cursor: not-allowed;
+	    }
+
+	    .mbu-overlay-icon-button {
+	      width: 32px;
+	      padding: 0;
+	      flex: 0 0 auto;
+	    }
+
+	    .mbu-overlay-copy {
+	      width: 28px;
+	      height: 28px;
+	      border-radius: 9px;
+	      margin-left: auto;
+	      color: var(--mbu-text-muted);
+	      background: color-mix(in oklab, var(--mbu-surface) 96%, transparent);
+	      transition:
+	        background 140ms ease,
+	        border-color 140ms ease,
+	        color 140ms ease;
+	    }
+
+	    .mbu-overlay-copy:hover:not(:disabled) {
+	      border-color: color-mix(in oklab, var(--mbu-accent) 45%, var(--mbu-border));
+	      background: color-mix(in oklab, var(--mbu-accent) 10%, var(--mbu-surface));
+	      color: var(--mbu-text);
+	    }
+
+	    .mbu-overlay-icon-button svg {
+	      width: 16px;
+	      height: 16px;
+	      stroke: currentColor;
+	      fill: none;
+	      stroke-width: 2.2;
+	      stroke-linecap: round;
+	      stroke-linejoin: round;
+	    }
+
+	    .mbu-overlay-icon-button.mbu-overlay-copy svg {
+	      width: 14px;
+	      height: 14px;
+	      stroke-width: 2;
+	    }
+
+	    .mbu-overlay-icon-button[data-active='true'] {
+	      border-color: color-mix(in oklab, var(--mbu-accent) 55%, var(--mbu-border));
+	      background: color-mix(in oklab, var(--mbu-accent) 14%, var(--mbu-surface));
+	    }
+
+	    .mbu-overlay-primary {
+	      border-color: color-mix(in oklab, var(--mbu-accent) 55%, var(--mbu-border));
+	      background: color-mix(in oklab, var(--mbu-accent) 14%, var(--mbu-surface));
+	    }
+
+    .mbu-overlay-drag {
+      appearance: none;
+      border: 1px solid var(--mbu-border);
+      background: color-mix(in oklab, var(--mbu-surface) 85%, transparent);
+      color: var(--mbu-text);
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border-radius: 10px;
+      cursor: grab;
+      touch-action: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+    }
+    .mbu-overlay-drag:active {
+      cursor: grabbing;
+    }
+
+    .mbu-overlay-body {
+      padding: 12px;
+      overflow: auto;
+      display: grid;
+      gap: 10px;
+    }
+
+    .mbu-overlay-body-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .mbu-overlay-status {
+      font-size: 12px;
+      font-weight: 750;
+      color: var(--mbu-text-muted);
+    }
+
+    .mbu-overlay-primary-text,
+    .mbu-overlay-secondary-text {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .mbu-overlay-secondary-text {
+      color: var(--mbu-text-muted);
+      font-size: 12px;
+    }
+
+    .mbu-overlay-event-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border: 1px solid var(--mbu-border);
+      border-radius: 12px;
+      background: color-mix(in oklab, var(--mbu-surface) 92%, transparent);
+      overflow: hidden;
+      font-size: 12px;
+    }
+
+    .mbu-overlay-event-table th,
+    .mbu-overlay-event-table td {
+      padding: 8px 10px;
+      vertical-align: top;
+      border-bottom: 1px solid var(--mbu-border);
+      text-align: left;
+    }
+
+    .mbu-overlay-event-table tr:last-child th,
+    .mbu-overlay-event-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .mbu-overlay-event-table th {
+      width: 84px;
+      color: var(--mbu-text-muted);
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .mbu-overlay-event-table td {
+      color: var(--mbu-text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .mbu-overlay-quote {
+      margin: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--mbu-border);
+      border-left: 4px solid color-mix(in oklab, var(--mbu-accent) 60%, var(--mbu-border));
+      border-radius: 12px;
+      background: color-mix(in oklab, var(--mbu-surface) 84%, transparent);
+      color: var(--mbu-text-muted);
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .mbu-overlay-aux {
+      border: 1px solid var(--mbu-border);
+      border-radius: 12px;
+      background: color-mix(in oklab, var(--mbu-surface) 92%, transparent);
+      overflow: hidden;
+    }
+
+    .mbu-overlay-aux-summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 750;
+      color: var(--mbu-text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .mbu-overlay-aux-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .mbu-overlay-aux-summary::after {
+      content: '⌄';
+      font-size: 12px;
+      opacity: 0.8;
+      transform: translateY(-1px);
+      transition: transform 140ms ease;
+    }
+
+    .mbu-overlay-aux[open] > .mbu-overlay-aux-summary::after {
+      transform: rotate(180deg) translateY(1px);
+    }
+
+    .mbu-overlay-aux .mbu-overlay-quote {
+      border: none;
+      border-top: 1px solid var(--mbu-border);
+      border-left: 4px solid color-mix(in oklab, var(--mbu-accent) 60%, var(--mbu-border));
+      border-radius: 0 0 12px 12px;
+      background: transparent;
+    }
+  `;
+
+  function ensureOverlayMount(): OverlayMount {
+    if (globalState.overlayMount?.host.isConnected) {
+      return globalState.overlayMount;
+    }
+
+    const existing = document.getElementById(OVERLAY_HOST_ID) as HTMLDivElement | null;
+    const host = existing || document.createElement('div');
+    host.id = OVERLAY_HOST_ID;
     host.style.cssText = `
       all: initial;
       position: fixed;
@@ -395,475 +636,48 @@ import type { SummarySource } from './shared_types';
       left: 16px;
       z-index: 2147483647;
       color-scheme: light;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     `;
 
-    const shadow = host.attachShadow({ mode: 'open' });
-    const style = document.createElement('style');
-    style.textContent = `
-      :host { all: initial; }
-      *, *::before, *::after { box-sizing: border-box; font-family: inherit; }
+    const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
+    ensureShadowUiBaseStyles(shadow);
 
-      .panel {
-        width: min(520px, calc(100vw - 32px));
-        max-height: min(60vh, 720px);
-        background: #fff;
-        border: 1px solid rgba(0,0,0,0.12);
-        border-radius: 14px;
-        box-shadow: 0 16px 44px rgba(0,0,0,0.28);
-        overflow: hidden;
-        display: grid;
-        grid-template-rows: auto 1fr;
-      }
+    if (!shadow.querySelector(`#${OVERLAY_STYLE_ID}`)) {
+      const style = document.createElement('style');
+      style.id = OVERLAY_STYLE_ID;
+      style.textContent = OVERLAY_CSS;
+      shadow.appendChild(style);
+    }
 
-      .header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        padding: 12px 14px;
-        background: #f7f7f7;
-        border-bottom: 1px solid rgba(0,0,0,0.08);
-      }
+    let rootEl = shadow.getElementById(OVERLAY_ROOT_ID) as HTMLDivElement | null;
+    if (!rootEl) {
+      rootEl = document.createElement('div');
+      rootEl.id = OVERLAY_ROOT_ID;
+      shadow.appendChild(rootEl);
+    }
 
-      .header-left {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: 0;
-        flex: 1;
-      }
+    const root = createRoot(rootEl);
 
-      .drag-handle {
-        appearance: none;
-        border: none;
-        background: transparent;
-        width: 22px;
-        height: 22px;
-        padding: 0;
-        border-radius: 8px;
-        cursor: grab;
-        touch-action: none;
-        display: grid;
-        place-items: center;
-        flex: 0 0 auto;
-      }
+    if (!host.isConnected) {
+      (document.documentElement ?? document.body ?? document).appendChild(host);
+    }
 
-      .drag-handle::before {
-        content: '';
-        width: 14px;
-        height: 14px;
-        background:
-          radial-gradient(circle, rgba(0,0,0,0.35) 1.2px, transparent 1.4px) 0 0 / 6px 6px;
-        opacity: 0.9;
-      }
-
-      .drag-handle:hover {
-        background: rgba(0,0,0,0.06);
-      }
-
-      :host(.dragging) .drag-handle {
-        cursor: grabbing;
-      }
-
-      .title {
-        font-size: 13px;
-        font-weight: 700;
-        color: #111;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .actions {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-      }
-
-      button {
-        appearance: none;
-        border: none;
-        border-radius: 10px;
-        padding: 8px 10px;
-        font-size: 12px;
-        line-height: 1;
-        cursor: pointer;
-        font-weight: 600;
-      }
-      button:disabled { opacity: 0.6; cursor: not-allowed; }
-
-      .btn-primary { background: #4285f4; color: #fff; }
-      .btn-dark { background: #111827; color: #fff; }
-      .btn-quiet { background: #6b7280; color: #fff; }
-
-      .body {
-        padding: 14px;
-        overflow: auto;
-      }
-
-      .status {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 12px;
-        border-radius: 12px;
-        background: #f3f4f6;
-        color: #111;
-        margin-bottom: 12px;
-        font-size: 13px;
-      }
-
-      .spinner {
-        width: 14px;
-        height: 14px;
-        border-radius: 999px;
-        border: 2px solid rgba(0,0,0,0.18);
-        border-top-color: rgba(0,0,0,0.60);
-        animation: spin 0.7s linear infinite;
-        flex: 0 0 auto;
-      }
-
-      @keyframes spin { to { transform: rotate(360deg); } }
-
-      pre {
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        font-size: 13px;
-        line-height: 1.5;
-        color: #111;
-      }
-
-      .secondary {
-        margin-top: 10px;
-        padding-top: 10px;
-        border-top: 1px solid rgba(0,0,0,0.08);
-        color: rgba(17,17,17,0.85);
-        font-size: 12px;
-      }
-    `;
-
-    const panel = document.createElement('div');
-    panel.className = 'panel';
-
-    const header = document.createElement('div');
-    header.className = 'header';
-
-    const headerLeft = document.createElement('div');
-    headerLeft.className = 'header-left';
-
-    const dragHandle = document.createElement('button');
-    dragHandle.type = 'button';
-    dragHandle.className = 'drag-handle';
-    dragHandle.title = 'ドラッグして移動';
-    dragHandle.setAttribute('aria-label', 'ドラッグして移動');
-
-    const title = document.createElement('div');
-    title.className = 'title';
-
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-
-    const copyButton = document.createElement('button');
-    copyButton.className = 'btn-primary';
-    copyButton.textContent = 'コピー';
-
-    const eventButton = document.createElement('button');
-    eventButton.className = 'btn-dark';
-    eventButton.textContent = 'イベント';
-
-    const openCalendarButton = document.createElement('button');
-    openCalendarButton.className = 'btn-primary';
-    openCalendarButton.textContent = 'カレンダー';
-
-    const copyLinkButton = document.createElement('button');
-    copyLinkButton.className = 'btn-quiet';
-    copyLinkButton.textContent = 'リンクコピー';
-
-    const closeButton = document.createElement('button');
-    closeButton.className = 'btn-quiet';
-    closeButton.textContent = '閉じる';
-
-    actions.appendChild(copyButton);
-    actions.appendChild(eventButton);
-    actions.appendChild(openCalendarButton);
-    actions.appendChild(copyLinkButton);
-    actions.appendChild(closeButton);
-    headerLeft.appendChild(dragHandle);
-    headerLeft.appendChild(title);
-    header.appendChild(headerLeft);
-    header.appendChild(actions);
-
-    const body = document.createElement('div');
-    body.className = 'body';
-
-    const content = document.createElement('div');
-    const primaryText = document.createElement('pre');
-    const secondaryText = document.createElement('pre');
-    secondaryText.className = 'secondary';
-
-    content.appendChild(primaryText);
-    content.appendChild(secondaryText);
-    body.appendChild(content);
-
-    panel.appendChild(header);
-    panel.appendChild(body);
-
-    shadow.appendChild(style);
-    shadow.appendChild(panel);
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        closeOverlay();
-      }
-    };
-
-    let dragging = false;
-    let dragPointerId: number | null = null;
-    let dragOffsetX = 0;
-    let dragOffsetY = 0;
-
-    const clampPosition = (left: number, top: number): { left: number; top: number } => {
-      const margin = 12;
-      const viewportW = window.innerWidth;
-      const viewportH = window.innerHeight;
-      const hostRect = host.getBoundingClientRect();
-      const width = hostRect.width || 520;
-      const height = hostRect.height || 300;
-      return {
-        left: Math.min(Math.max(margin, left), Math.max(margin, viewportW - width - margin)),
-        top: Math.min(Math.max(margin, top), Math.max(margin, viewportH - height - margin)),
-      };
-    };
-
-    const startDrag = (event: PointerEvent): void => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      overlayPinned = true;
-      overlayAnchor = null;
-
-      const rect = host.getBoundingClientRect();
-      dragOffsetX = event.clientX - rect.left;
-      dragOffsetY = event.clientY - rect.top;
-      dragging = true;
-      dragPointerId = event.pointerId;
-      host.classList.add('dragging');
-      try {
-        dragHandle.setPointerCapture(event.pointerId);
-      } catch {
-        // no-op
-      }
-    };
-
-    const moveDrag = (event: PointerEvent): void => {
-      if (!dragging) return;
-      if (dragPointerId !== null && event.pointerId !== dragPointerId) return;
-      const nextLeft = event.clientX - dragOffsetX;
-      const nextTop = event.clientY - dragOffsetY;
-      const clamped = clampPosition(nextLeft, nextTop);
-      host.style.left = `${Math.round(clamped.left)}px`;
-      host.style.top = `${Math.round(clamped.top)}px`;
-    };
-
-    const endDrag = (event: PointerEvent): void => {
-      if (!dragging) return;
-      if (dragPointerId !== null && event.pointerId !== dragPointerId) return;
-      dragging = false;
-      dragPointerId = null;
-      host.classList.remove('dragging');
-      try {
-        dragHandle.releasePointerCapture(event.pointerId);
-      } catch {
-        // no-op
-      }
-    };
-
-    const onCopy = (): void => {
-      const text = overlayMode === 'event' ? overlayEventText : overlaySummaryText;
-      if (!text) return;
-      void (async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          showNotification('コピーしました');
-        } catch {
-          showNotification('コピーに失敗しました');
-        }
-      })();
-    };
-
-    const onOpenCalendar = (): void => {
-      if (!overlayCalendarUrl) return;
-      window.open(overlayCalendarUrl, '_blank', 'noopener,noreferrer');
-    };
-
-    const onCopyLink = (): void => {
-      if (!overlayCalendarUrl) return;
-      void (async () => {
-        try {
-          await navigator.clipboard.writeText(overlayCalendarUrl);
-          showNotification('コピーしました');
-        } catch {
-          showNotification('コピーに失敗しました');
-        }
-      })();
-    };
-
-    const onEvent = (): void => {
-      void (async () => {
-        if (eventButton) eventButton.disabled = true;
-        const prevText = eventButton.textContent;
-        eventButton.textContent = '処理中...';
-
-        try {
-          const target = await getSummaryTargetText();
-          if (target.source !== 'selection') {
-            showNotification('選択範囲が見つかりませんでした');
-            return;
-          }
-
-          const response = await sendMessageToBackground<ContentToBackgroundMessage, SummarizeEventResponse>({
-            action: 'summarizeEvent',
-            target,
-          });
-
-          if (!response.ok) {
-            showEventOverlayError(response.error);
-            return;
-          }
-
-          showEventOverlay(response.eventText, response.calendarUrl);
-        } catch (error) {
-          showEventOverlayError(error instanceof Error ? error.message : 'イベント要約に失敗しました');
-        } finally {
-          eventButton.textContent = prevText ?? 'イベント';
-          eventButton.disabled = false;
-        }
-      })();
-    };
-
-    window.addEventListener('keydown', onKeyDown, true);
-    closeButton.addEventListener('click', closeOverlay);
-    copyButton.addEventListener('click', onCopy);
-    openCalendarButton.addEventListener('click', onOpenCalendar);
-    copyLinkButton.addEventListener('click', onCopyLink);
-    eventButton.addEventListener('click', onEvent);
-    dragHandle.addEventListener('pointerdown', startDrag);
-    dragHandle.addEventListener('pointermove', moveDrag);
-    dragHandle.addEventListener('pointerup', endDrag);
-    dragHandle.addEventListener('pointercancel', endDrag);
-
-    overlayCleanup = () => {
-      window.removeEventListener('keydown', onKeyDown, true);
-      closeButton.removeEventListener('click', closeOverlay);
-      copyButton.removeEventListener('click', onCopy);
-      openCalendarButton.removeEventListener('click', onOpenCalendar);
-      copyLinkButton.removeEventListener('click', onCopyLink);
-      eventButton.removeEventListener('click', onEvent);
-      dragHandle.removeEventListener('pointerdown', startDrag);
-      dragHandle.removeEventListener('pointermove', moveDrag);
-      dragHandle.removeEventListener('pointerup', endDrag);
-      dragHandle.removeEventListener('pointercancel', endDrag);
-    };
-
-    (document.documentElement ?? document.body ?? document).appendChild(host);
-
-    overlayEls = {
-      host,
-      title,
-      content,
-      primaryText,
-      secondaryText,
-      copyButton,
-      eventButton,
-      openCalendarButton,
-      copyLinkButton,
-      closeButton,
-    };
-
-    return overlayEls;
+    globalState.overlayMount = { host, shadow, root };
+    return globalState.overlayMount;
   }
 
   function closeOverlay(): void {
-    if (overlayCleanup) overlayCleanup();
-    overlayCleanup = null;
-    overlayEls?.host.remove();
-    overlayEls = null;
-    overlayMode = 'summary';
-    overlaySummaryText = '';
-    overlayEventText = '';
-    overlayCalendarUrl = '';
-    overlayAnchor = null;
-    overlayPinned = false;
-  }
-
-  function setOverlayTitle(text: string): void {
-    const els = ensureOverlay();
-    els.title.textContent = text;
-  }
-
-  function setOverlayActionsVisibility(nextMode: 'summary' | 'event' | 'text'): void {
-    const els = ensureOverlay();
-    if (nextMode === 'event') {
-      els.eventButton.style.display = 'none';
-      els.openCalendarButton.style.display = '';
-      els.copyLinkButton.style.display = '';
-      return;
+    const mount = globalState.overlayMount;
+    if (!mount) return;
+    try {
+      mount.root.unmount();
+    } catch {
+      // no-op
     }
-    if (nextMode === 'text') {
-      els.eventButton.style.display = 'none';
-      els.openCalendarButton.style.display = 'none';
-      els.copyLinkButton.style.display = 'none';
-      return;
-    }
-    els.eventButton.style.display = '';
-    els.openCalendarButton.style.display = 'none';
-    els.copyLinkButton.style.display = 'none';
+    mount.host.remove();
+    globalState.overlayMount = null;
   }
 
-  function setOverlayContent(
-    primary: string,
-    secondary: string,
-    status: 'loading' | 'ready' | 'error',
-    loadingLabel: string = '要約中...',
-  ): void {
-    const els = ensureOverlay();
-    els.primaryText.textContent = primary;
-    els.secondaryText.textContent = secondary;
-    els.secondaryText.style.display = secondary ? '' : 'none';
-
-    if (status === 'loading') {
-      els.content.prepend(createStatusRow(loadingLabel, true));
-    } else if (status === 'error') {
-      els.content.prepend(createStatusRow('エラー', false));
-    } else {
-      const existing = els.content.querySelector('.status');
-      if (existing) existing.remove();
-    }
-  }
-
-  function createStatusRow(text: string, spinning: boolean): HTMLDivElement {
-    const els = ensureOverlay();
-    const existing = els.content.querySelector('.status');
-    if (existing) existing.remove();
-
-    const row = document.createElement('div');
-    row.className = 'status';
-    if (spinning) {
-      const spinner = document.createElement('div');
-      spinner.className = 'spinner';
-      row.appendChild(spinner);
-    }
-    const label = document.createElement('div');
-    label.textContent = text;
-    row.appendChild(label);
-    return row;
-  }
-
-  function getSelectionAnchorRect(): DOMRect | null {
+  function getSelectionAnchorRect(): OverlayViewModel['anchorRect'] {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return null;
 
@@ -872,227 +686,266 @@ import type { SummarySource } from './shared_types';
     const rect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
 
     if (!rect || (rect.width === 0 && rect.height === 0)) return null;
-    return rect;
+    return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
   }
 
-  function positionOverlay(): void {
-    const els = ensureOverlay();
-
-    const margin = 16;
-    const viewportW = window.innerWidth;
-    const viewportH = window.innerHeight;
-
-    const hostRect = els.host.getBoundingClientRect();
-    const width = hostRect.width || 520;
-    const height = hostRect.height || 300;
-
-    if (overlayPinned) {
-      const left = Number.parseFloat(els.host.style.left || 'NaN');
-      const top = Number.parseFloat(els.host.style.top || 'NaN');
-      const nextLeft = Number.isFinite(left) ? left : hostRect.left;
-      const nextTop = Number.isFinite(top) ? top : hostRect.top;
-      const clampedLeft = Math.min(Math.max(margin, nextLeft), Math.max(margin, viewportW - width - margin));
-      const clampedTop = Math.min(Math.max(margin, nextTop), Math.max(margin, viewportH - height - margin));
-      els.host.style.left = `${Math.round(clampedLeft)}px`;
-      els.host.style.top = `${Math.round(clampedTop)}px`;
-      return;
-    }
-
-    const anchor = overlayAnchor;
-    if (!anchor) {
-      const left = Math.max(margin, viewportW - width - margin);
-      els.host.style.left = `${Math.round(left)}px`;
-      els.host.style.top = `${margin}px`;
-      return;
-    }
-
-    const preferredLeft = anchor.left;
-    const preferredTop = anchor.bottom + 10;
-
-    const left = Math.min(Math.max(margin, preferredLeft), Math.max(margin, viewportW - width - margin));
-
-    const top = Math.min(Math.max(margin, preferredTop), Math.max(margin, viewportH - height - margin));
-
-    els.host.style.left = `${Math.round(left)}px`;
-    els.host.style.top = `${Math.round(top)}px`;
+  function renderOverlay(viewModel: OverlayViewModel): void {
+    const mount = ensureOverlayMount();
+    mount.root.render(
+      createElement(OverlayApp, {
+        host: mount.host,
+        portalContainer: mount.shadow,
+        viewModel,
+        onDismiss: () => {
+          closeOverlay();
+        },
+      }),
+    );
   }
 
-  function showSummaryOverlay(request: Extract<ContentRequest, { action: 'showSummaryOverlay' }>): void {
-    overlayMode = 'summary';
-    setOverlayActionsVisibility('summary');
-
-    const source = request.source;
-    const title = source === 'selection' ? '要約（選択範囲）' : '要約（ページ本文）';
-    setOverlayTitle(title);
-
-    const els = ensureOverlay();
-    overlayAnchor = source === 'selection' ? getSelectionAnchorRect() : null;
-
-    const summary = request.summary?.trim() ?? '';
-    const error = request.error?.trim() ?? '';
-
-    if (request.status === 'loading') {
-      overlaySummaryText = '';
-      els.copyButton.disabled = true;
-      els.eventButton.disabled = true;
-      els.eventButton.style.display = source === 'selection' ? '' : 'none';
-      setOverlayContent('', '処理に数秒かかることがあります。', 'loading');
-      requestAnimationFrame(positionOverlay);
-      return;
-    }
-
-    if (request.status === 'error') {
-      overlaySummaryText = '';
-      els.copyButton.disabled = true;
-      els.eventButton.disabled = true;
-      els.eventButton.style.display = 'none';
-      setOverlayContent(
-        error || '要約に失敗しました',
-        'OpenAI API Token未設定の場合は、拡張機能のポップアップ「設定」タブで設定してください。',
-        'error',
-      );
-      requestAnimationFrame(positionOverlay);
-      return;
-    }
-
-    overlaySummaryText = summary;
-    els.copyButton.disabled = !summary;
-    els.eventButton.disabled = false;
-    els.eventButton.style.display = source === 'selection' ? '' : 'none';
-    setOverlayContent(summary || '要約結果が空でした', '', 'ready');
-    requestAnimationFrame(positionOverlay);
+  function stripSourceSuffix(title: string): string {
+    return title.replace(/（(?:選択範囲|ページ本文)）\s*$/, '').trim();
   }
 
-  function showEventOverlay(eventText: string, calendarUrl: string): void {
-    overlayMode = 'event';
-    overlayEventText = eventText;
-    overlayCalendarUrl = calendarUrl;
-    overlayAnchor = getSelectionAnchorRect();
-    setOverlayActionsVisibility('event');
-    setOverlayTitle('イベント要約');
+  let summarizeOverlayTitleCache: string | null = null;
+  let summarizeOverlayTitleInFlight: Promise<string> | null = null;
 
-    const els = ensureOverlay();
-    els.copyButton.disabled = !eventText;
-    els.openCalendarButton.disabled = !calendarUrl;
-    els.copyLinkButton.disabled = !calendarUrl;
-    setOverlayContent(eventText, '', 'ready');
-    requestAnimationFrame(positionOverlay);
+  function findContextActionTitle(actions: unknown, id: string): string | null {
+    if (!Array.isArray(actions)) return null;
+    for (const item of actions) {
+      if (typeof item !== 'object' || item === null) continue;
+      const record = item as Record<string, unknown>;
+      if (typeof record.id !== 'string') continue;
+      if (record.id.trim() !== id) continue;
+      const title = typeof record.title === 'string' ? record.title.trim() : '';
+      if (!title) continue;
+      return title;
+    }
+    return null;
   }
 
-  function showEventOverlayError(error: string): void {
-    overlayMode = 'event';
-    overlayEventText = '';
-    overlayCalendarUrl = '';
-    overlayAnchor = getSelectionAnchorRect();
-    setOverlayActionsVisibility('event');
-    setOverlayTitle('イベント要約');
+  async function getSummarizeOverlayTitle(): Promise<string> {
+    if (summarizeOverlayTitleCache) return summarizeOverlayTitleCache;
+    if (summarizeOverlayTitleInFlight) return summarizeOverlayTitleInFlight;
 
-    const els = ensureOverlay();
-    els.copyButton.disabled = true;
-    els.openCalendarButton.disabled = true;
-    els.copyLinkButton.disabled = true;
-    setOverlayContent(error || 'イベント要約に失敗しました', '', 'error');
-    requestAnimationFrame(positionOverlay);
+    summarizeOverlayTitleInFlight = (async () => {
+      try {
+        const stored = (await storageSyncGet(['contextActions'])) as { contextActions?: unknown };
+        const title = findContextActionTitle(stored.contextActions, 'builtin:summarize');
+        summarizeOverlayTitleCache = stripSourceSuffix(title ?? '') || '要約';
+      } catch {
+        summarizeOverlayTitleCache = '要約';
+      } finally {
+        summarizeOverlayTitleInFlight = null;
+      }
+      return summarizeOverlayTitleCache;
+    })();
+
+    return summarizeOverlayTitleInFlight;
   }
 
   function showActionOverlay(request: Extract<ContentRequest, { action: 'showActionOverlay' }>): void {
-    const source = request.source;
-    overlayAnchor = source === 'selection' ? getSelectionAnchorRect() : null;
-
-    if (request.mode === 'event') {
-      overlayMode = 'event';
-      setOverlayActionsVisibility('event');
-    } else {
-      overlayMode = 'text';
-      setOverlayActionsVisibility('text');
-    }
-
-    setOverlayTitle(request.title);
-
-    const els = ensureOverlay();
     const primary = request.primary?.trim() ?? '';
     const secondary = request.secondary?.trim() ?? '';
     const calendarUrl = request.calendarUrl?.trim() ?? '';
+    const ics = request.ics?.trim() ?? '';
+    const event = request.event;
 
-    if (request.status === 'loading') {
-      overlaySummaryText = '';
-      overlayEventText = '';
-      overlayCalendarUrl = '';
-      els.copyButton.disabled = true;
-      els.openCalendarButton.disabled = true;
-      els.copyLinkButton.disabled = true;
-      setOverlayContent('', secondary || '処理に数秒かかることがあります。', 'loading', '処理中...');
-      requestAnimationFrame(positionOverlay);
-      return;
-    }
+    const anchorRect = request.source === 'selection' ? getSelectionAnchorRect() : null;
 
-    if (request.status === 'error') {
-      overlaySummaryText = '';
-      overlayEventText = '';
-      overlayCalendarUrl = '';
-      els.copyButton.disabled = true;
-      els.openCalendarButton.disabled = true;
-      els.copyLinkButton.disabled = true;
-      setOverlayContent(primary || '処理に失敗しました', secondary, 'error');
-      requestAnimationFrame(positionOverlay);
-      return;
-    }
-
-    if (request.mode === 'event') {
-      overlayEventText = primary;
-      overlayCalendarUrl = calendarUrl;
-      els.copyButton.disabled = !primary;
-      els.openCalendarButton.disabled = !calendarUrl;
-      els.copyLinkButton.disabled = !calendarUrl;
-      setOverlayContent(primary || '結果が空でした', secondary, 'ready');
-      requestAnimationFrame(positionOverlay);
-      return;
-    }
-
-    overlaySummaryText = primary;
-    els.copyButton.disabled = !primary;
-    setOverlayContent(primary || '結果が空でした', secondary, 'ready');
-    requestAnimationFrame(positionOverlay);
-  }
-
-  function sendMessageToBackground<TRequest, TResponse>(message: TRequest): Promise<TResponse> {
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(message, (response: TResponse) => {
-        const err = chrome.runtime.lastError;
-        if (err) {
-          reject(new Error(err.message));
-          return;
-        }
-        resolve(response);
-      });
+    renderOverlay({
+      open: true,
+      status: request.status,
+      mode: request.mode,
+      source: request.source,
+      title: stripSourceSuffix(request.title),
+      primary:
+        request.status === 'loading'
+          ? ''
+          : request.status === 'ready'
+            ? primary || '結果が空でした'
+            : primary || '処理に失敗しました',
+      secondary: request.status === 'loading' ? secondary || '処理に数秒かかることがあります。' : secondary,
+      event: request.mode === 'event' && request.status === 'ready' && event ? event : undefined,
+      calendarUrl: calendarUrl || undefined,
+      ics: ics || undefined,
+      anchorRect,
     });
   }
 
+  function showSummaryOverlay(request: Extract<ContentRequest, { action: 'showSummaryOverlay' }>): void {
+    const fallbackTitle = summarizeOverlayTitleCache ?? '要約';
+    const summary = request.summary?.trim() ?? '';
+    const error = request.error?.trim() ?? '';
+
+    const anchorRect = request.source === 'selection' ? getSelectionAnchorRect() : null;
+
+    renderOverlay({
+      open: true,
+      status: request.status,
+      mode: 'text',
+      source: request.source,
+      title: fallbackTitle,
+      primary:
+        request.status === 'ready'
+          ? summary || '要約結果が空でした'
+          : request.status === 'error'
+            ? error || '要約に失敗しました'
+            : '',
+      secondary:
+        request.status === 'loading'
+          ? '処理に数秒かかることがあります。'
+          : request.status === 'error'
+            ? 'OpenAI API Token未設定の場合は、拡張機能のポップアップ「設定」タブで設定してください。'
+            : '',
+      anchorRect,
+    });
+
+    void (async () => {
+      const title = await getSummarizeOverlayTitle();
+      if (title === fallbackTitle) return;
+      renderOverlay({
+        open: true,
+        status: request.status,
+        mode: 'text',
+        source: request.source,
+        title,
+        primary:
+          request.status === 'ready'
+            ? summary || '要約結果が空でした'
+            : request.status === 'error'
+              ? error || '要約に失敗しました'
+              : '',
+        secondary:
+          request.status === 'loading'
+            ? '処理に数秒かかることがあります。'
+            : request.status === 'error'
+              ? 'OpenAI API Token未設定の場合は、拡張機能のポップアップ「設定」タブで設定してください。'
+              : '',
+        anchorRect,
+      });
+    })();
+  }
+
   // ========================================
-  // 6. 自動実行ロジック
+  // 6. メッセージリスナー
   // ========================================
 
-  (async function autoEnableTableSort(): Promise<void> {
-    try {
-      const { domainPatterns = [], autoEnableSort = false }: StorageData = (await storageSyncGet([
-        'domainPatterns',
-        'autoEnableSort',
-      ])) as StorageData;
-
-      if (autoEnableSort) {
-        enableTableSort();
-        startTableObserver();
-        return;
+  chrome.runtime.onMessage.addListener(
+    (request: ContentRequest, _sender: chrome.runtime.MessageSender, sendResponse) => {
+      switch (request.action) {
+        case 'enableTableSort': {
+          enableTableSort();
+          startTableObserver();
+          sendResponse({ success: true });
+          return;
+        }
+        case 'showNotification': {
+          showNotification(request.message);
+          sendResponse({ ok: true });
+          return;
+        }
+        case 'getSummaryTargetText': {
+          void (async () => {
+            try {
+              const target = await getSummaryTargetText({ ignoreSelection: request.ignoreSelection });
+              sendResponse(target);
+            } catch {
+              sendResponse({
+                text: '',
+                source: 'page',
+                title: document.title ?? '',
+                url: window.location.href,
+              } satisfies SummaryTarget);
+            }
+          })();
+          return true;
+        }
+        case 'showSummaryOverlay': {
+          showSummaryOverlay(request);
+          sendResponse({ ok: true });
+          return;
+        }
+        case 'showActionOverlay': {
+          showActionOverlay(request);
+          sendResponse({ ok: true });
+          return;
+        }
       }
+    },
+  );
 
-      if (domainPatterns.length > 0 && matchesAnyPattern(domainPatterns)) {
-        enableTableSort();
-        startTableObserver();
-      }
-    } catch (error) {
-      console.error('Auto-enable table sort failed:', error);
+  // ========================================
+  // 7. 自動実行ロジック（SPA URL変化も含む）
+  // ========================================
+
+  let tableConfig: { domainPatterns: string[]; autoEnableSort: boolean } = {
+    domainPatterns: [],
+    autoEnableSort: false,
+  };
+
+  function normalizePatterns(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.map(item => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
+  }
+
+  function maybeEnableTableSortFromConfig(): void {
+    if (tableConfig.autoEnableSort) {
+      enableTableSort();
+      startTableObserver();
+      return;
     }
+    if (tableConfig.domainPatterns.length > 0 && matchesAnyPattern(tableConfig.domainPatterns)) {
+      enableTableSort();
+      startTableObserver();
+    }
+  }
+
+  async function refreshTableConfig(): Promise<void> {
+    try {
+      const data = (await storageSyncGet(['domainPatterns', 'autoEnableSort'])) as StorageData;
+      tableConfig = {
+        domainPatterns: normalizePatterns(data.domainPatterns),
+        autoEnableSort: Boolean(data.autoEnableSort),
+      };
+    } catch {
+      tableConfig = { domainPatterns: [], autoEnableSort: false };
+    }
+  }
+
+  void (async () => {
+    await refreshTableConfig();
+    maybeEnableTableSortFromConfig();
   })();
+
+  if (chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== 'sync') return;
+
+      if ('contextActions' in changes) {
+        summarizeOverlayTitleCache = null;
+        summarizeOverlayTitleInFlight = null;
+      }
+
+      if (!('domainPatterns' in changes || 'autoEnableSort' in changes)) return;
+      void (async () => {
+        await refreshTableConfig();
+        maybeEnableTableSortFromConfig();
+      })();
+    });
+  }
+
+  let lastHref = window.location.href;
+  window.setInterval(() => {
+    const href = window.location.href;
+    if (href === lastHref) return;
+    lastHref = href;
+    maybeEnableTableSortFromConfig();
+  }, 1000);
+
+  // ========================================
+  // 8. ストレージヘルパー
+  // ========================================
 
   function storageSyncGet(keys: string[]): Promise<unknown> {
     return new Promise((resolve, reject) => {

@@ -51,7 +51,7 @@ export function computeEventDateRange(params: {
 
   const startUtc = formatUtcDateTimeFromDate(startDate);
   const endUtc = endDate ? formatUtcDateTimeFromDate(endDate) : null;
-  if (!startUtc || !endUtc) return null;
+  if (!(startUtc && endUtc)) return null;
 
   return { kind: 'dateTime', startUtc, endUtc };
 }
