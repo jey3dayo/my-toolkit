@@ -1,0 +1,214 @@
+:root {
+  /* ========================================
+   * Semantic Tokens (meaning-based)
+   * - Dark is the default when data-theme is absent
+   * ====================================== */
+
+  /* Layout sizing */
+  --layout-popup-width: 800px;
+  --layout-popup-height: 600px;
+  --layout-rail: 76px;
+  --layout-drawer: 284px;
+
+  /* Spacing semantics */
+  --spacing-xs: var(--primitive-space-2);
+  --spacing-sm: var(--primitive-space-3);
+  --spacing-md: var(--primitive-space-4);
+  --spacing-lg: var(--primitive-space-6);
+  --spacing-xl: var(--primitive-space-8);
+
+  /* Radii semantics */
+  --radius-sm: var(--primitive-radius-10);
+  --radius-md: var(--primitive-radius-12);
+  --radius-lg: var(--primitive-radius-14);
+
+  /* Toast insets (override per-surface when needed) */
+  --toast-screen-inset: 12px 12px auto auto;
+  --toast-surface-inset: 12px 12px auto auto;
+}
+
+:host {
+  --layout-popup-width: 800px;
+  --layout-popup-height: 600px;
+  --layout-rail: 76px;
+  --layout-drawer: 284px;
+
+  --spacing-xs: var(--primitive-space-2);
+  --spacing-sm: var(--primitive-space-3);
+  --spacing-md: var(--primitive-space-4);
+  --spacing-lg: var(--primitive-space-6);
+  --spacing-xl: var(--primitive-space-8);
+
+  --radius-sm: var(--primitive-radius-10);
+  --radius-md: var(--primitive-radius-12);
+  --radius-lg: var(--primitive-radius-14);
+
+  --toast-screen-inset: 12px 12px auto auto;
+  --toast-surface-inset: 12px 12px auto auto;
+}
+
+:root:not([data-theme]),
+:root[data-theme="dark"] {
+  --color-bg: var(--primitive-color-slate-950);
+  --color-surface: var(--primitive-color-slate-900);
+  --color-surface-2: var(--primitive-color-slate-850);
+  --color-border: var(--primitive-color-slate-800);
+  --color-border-subtle: var(--primitive-alpha-white-08);
+  --color-border-ui: var(--primitive-alpha-white-12);
+  --color-text: var(--primitive-color-slate-100);
+  --color-text-muted: var(--primitive-color-slate-200);
+
+  --color-primary: var(--primitive-color-green-500);
+  --color-primary-2: var(--primitive-color-cyan-300);
+  --color-danger: var(--primitive-color-red-400);
+
+  --shadow-elevation: var(--primitive-shadow-dark);
+  --focus-ring: 2px solid rgba(123, 220, 247, 0.55);
+  --focus-ring-offset: 2px;
+  --color-scrim: rgba(10, 14, 22, 0.68);
+
+  color-scheme: dark;
+}
+
+:host:not([data-theme]),
+:host([data-theme="dark"]) {
+  --color-bg: var(--primitive-color-slate-950);
+  --color-surface: var(--primitive-color-slate-900);
+  --color-surface-2: var(--primitive-color-slate-850);
+  --color-border: var(--primitive-color-slate-800);
+  --color-border-subtle: var(--primitive-alpha-white-08);
+  --color-border-ui: var(--primitive-alpha-white-12);
+  --color-text: var(--primitive-color-slate-100);
+  --color-text-muted: var(--primitive-color-slate-200);
+
+  --color-primary: var(--primitive-color-green-500);
+  --color-primary-2: var(--primitive-color-cyan-300);
+  --color-danger: var(--primitive-color-red-400);
+
+  --shadow-elevation: var(--primitive-shadow-dark);
+  --focus-ring: 2px solid rgba(123, 220, 247, 0.55);
+  --focus-ring-offset: 2px;
+  --color-scrim: rgba(10, 14, 22, 0.68);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --color-bg: var(--primitive-color-gray-50);
+  --color-surface: var(--primitive-color-gray-50);
+  --color-surface-2: var(--primitive-color-gray-100);
+  --color-border: var(--primitive-alpha-black-12);
+  --color-border-subtle: var(--primitive-alpha-black-08);
+  --color-border-ui: var(--primitive-alpha-black-12);
+  --color-text: var(--primitive-color-gray-900);
+  --color-text-muted: rgba(17, 24, 39, 0.7);
+
+  --color-primary: var(--primitive-color-blue-500);
+  --color-primary-2: var(--primitive-color-cyan-300);
+  --color-danger: var(--primitive-color-red-600);
+
+  --shadow-elevation: var(--primitive-shadow-light);
+  --focus-ring: 2px solid rgba(66, 133, 244, 0.65);
+  --focus-ring-offset: 2px;
+  --color-scrim: rgba(15, 23, 42, 0.35);
+
+  color-scheme: light;
+}
+
+:host([data-theme="light"]) {
+  --color-bg: var(--primitive-color-gray-50);
+  --color-surface: var(--primitive-color-gray-50);
+  --color-surface-2: var(--primitive-color-gray-100);
+  --color-border: var(--primitive-alpha-black-12);
+  --color-border-subtle: var(--primitive-alpha-black-08);
+  --color-border-ui: var(--primitive-alpha-black-12);
+  --color-text: var(--primitive-color-gray-900);
+  --color-text-muted: rgba(17, 24, 39, 0.7);
+
+  --color-primary: var(--primitive-color-blue-500);
+  --color-primary-2: var(--primitive-color-cyan-300);
+  --color-danger: var(--primitive-color-red-600);
+
+  --shadow-elevation: var(--primitive-shadow-light);
+  --focus-ring: 2px solid rgba(66, 133, 244, 0.65);
+  --focus-ring-offset: 2px;
+  --color-scrim: rgba(15, 23, 42, 0.35);
+
+  color-scheme: light;
+}
+
+:root {
+  /* ========================================
+   * Legacy alias tokens (migration helpers)
+   * ====================================== */
+
+  /* popup.css legacy */
+  --bg: var(--color-bg);
+  --bg-2: color-mix(in oklab, var(--color-bg) 88%, var(--color-surface));
+  --panel: var(--color-surface);
+  --panel-soft: var(--color-surface-2);
+  --line: var(--color-border);
+  --text: var(--color-text);
+  --text-sub: var(--color-text-muted);
+  --accent: var(--color-primary);
+  --accent-2: var(--color-primary-2);
+  --danger: var(--color-danger);
+  --shadow: var(--shadow-elevation);
+  --radius: var(--radius-lg);
+
+  --popup-width: var(--layout-popup-width);
+  --popup-height: var(--layout-popup-height);
+  --rail: var(--layout-rail);
+  --drawer: var(--layout-drawer);
+
+  /* ui/styles.ts legacy (Toast/Overlay) */
+  --mbu-bg: var(--color-bg);
+  --mbu-surface: var(--color-surface);
+  --mbu-surface-2: var(--color-surface-2);
+  --mbu-border: var(--color-border-ui);
+  --mbu-text: var(--color-text);
+  --mbu-text-muted: var(--color-text-muted);
+  --mbu-accent: var(--color-primary);
+  --mbu-danger: var(--color-danger);
+  --mbu-radius: var(--radius-lg);
+  --mbu-shadow: var(--shadow-elevation);
+  --mbu-focus-ring: var(--focus-ring);
+  --mbu-focus-ring-offset: var(--focus-ring-offset);
+  --mbu-toast-screen-inset: var(--toast-screen-inset);
+  --mbu-toast-surface-inset: var(--toast-surface-inset);
+}
+
+:host {
+  --bg: var(--color-bg);
+  --bg-2: color-mix(in oklab, var(--color-bg) 88%, var(--color-surface));
+  --panel: var(--color-surface);
+  --panel-soft: var(--color-surface-2);
+  --line: var(--color-border);
+  --text: var(--color-text);
+  --text-sub: var(--color-text-muted);
+  --accent: var(--color-primary);
+  --accent-2: var(--color-primary-2);
+  --danger: var(--color-danger);
+  --shadow: var(--shadow-elevation);
+  --radius: var(--radius-lg);
+
+  --popup-width: var(--layout-popup-width);
+  --popup-height: var(--layout-popup-height);
+  --rail: var(--layout-rail);
+  --drawer: var(--layout-drawer);
+
+  --mbu-bg: var(--color-bg);
+  --mbu-surface: var(--color-surface);
+  --mbu-surface-2: var(--color-surface-2);
+  --mbu-border: var(--color-border-ui);
+  --mbu-text: var(--color-text);
+  --mbu-text-muted: var(--color-text-muted);
+  --mbu-accent: var(--color-primary);
+  --mbu-danger: var(--color-danger);
+  --mbu-radius: var(--radius-lg);
+  --mbu-shadow: var(--shadow-elevation);
+  --mbu-focus-ring: var(--focus-ring);
+  --mbu-focus-ring-offset: var(--focus-ring-offset);
+  --mbu-toast-screen-inset: var(--toast-screen-inset);
+  --mbu-toast-surface-inset: var(--toast-surface-inset);
+}

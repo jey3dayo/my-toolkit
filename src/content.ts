@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { OverlayApp, type OverlayViewModel } from './content/overlay/OverlayApp';
 import type { ExtractedEvent, SummarySource } from './shared_types';
 import { ensureShadowUiBaseStyles } from './ui/styles';
+import { applyTheme, isTheme, type Theme } from './ui/theme';
 import { createNotifications, type Notifier, ToastHost, type ToastManager } from './ui/toast';
 
 (() => {
@@ -46,7 +47,6 @@ import { createNotifications, type Notifier, ToastHost, type ToastManager } from
 
   const OVERLAY_HOST_ID = 'my-browser-utils-overlay';
   const OVERLAY_ROOT_ID = 'mbu-overlay-react-root';
-  const OVERLAY_STYLE_ID = 'mbu-overlay-react-styles';
 
   const TOAST_HOST_ID = 'my-browser-utils-toast-host';
   const TOAST_ROOT_ID = 'mbu-toast-react-root';
@@ -80,6 +80,31 @@ import { createNotifications, type Notifier, ToastHost, type ToastManager } from
     };
   }
   const globalState = globalContainer.__MBU_CONTENT_STATE__;
+
+  let currentTheme: Theme = 'dark';
+
+  function normalizeTheme(value: unknown): Theme {
+    return isTheme(value) ? value : 'dark';
+  }
+
+  function applyThemeToMounts(theme: Theme): void {
+    if (globalState.toastMount?.host.isConnected) {
+      applyTheme(theme, globalState.toastMount.shadow);
+    }
+    if (globalState.overlayMount?.host.isConnected) {
+      applyTheme(theme, globalState.overlayMount.shadow);
+    }
+  }
+
+  async function refreshThemeFromStorage(): Promise<void> {
+    try {
+      const data = (await storageLocalGet(['theme'])) as { theme?: unknown };
+      currentTheme = normalizeTheme(data.theme);
+    } catch {
+      currentTheme = 'dark';
+    }
+    applyThemeToMounts(currentTheme);
+  }
 
   // ========================================
   // 1. ユーティリティ関数（URLパターン）
@@ -123,6 +148,7 @@ import { createNotifications, type Notifier, ToastHost, type ToastManager } from
     return;
   }
   globalState.initialized = true;
+  void refreshThemeFromStorage();
 
   // ========================================
   // 2. テーブルソート機能
@@ -252,17 +278,10 @@ import { createNotifications, type Notifier, ToastHost, type ToastManager } from
     const existing = document.getElementById(TOAST_HOST_ID) as HTMLDivElement | null;
     const host = existing || document.createElement('div');
     host.id = TOAST_HOST_ID;
-    host.style.cssText = `
-      all: initial;
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 2147483647;
-      color-scheme: light;
-    `;
 
     const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
     ensureShadowUiBaseStyles(shadow);
+    applyTheme(currentTheme, shadow);
 
     let rootEl = shadow.getElementById(TOAST_ROOT_ID) as HTMLDivElement | null;
     if (!rootEl) {
@@ -361,312 +380,7 @@ import { createNotifications, type Notifier, ToastHost, type ToastManager } from
   // 5. Overlay (React + Shadow DOM)
   // ========================================
 
-  const OVERLAY_CSS = `
-    :host { all: initial; }
-    *, *::before, *::after {
-      box-sizing: border-box;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-
-    .mbu-overlay-panel {
-      width: min(520px, calc(100vw - 32px));
-      max-height: min(60vh, 720px);
-      background: var(--mbu-surface);
-      color: var(--mbu-text);
-      border: 1px solid var(--mbu-border);
-      border-radius: var(--mbu-radius);
-      box-shadow: var(--mbu-shadow);
-      overflow: hidden;
-      display: grid;
-      grid-template-rows: auto 1fr;
-    }
-
-    .mbu-overlay-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 10px 12px;
-      background: color-mix(in oklab, var(--mbu-surface-2) 75%, transparent);
-      border-bottom: 1px solid var(--mbu-border);
-    }
-
-    .mbu-overlay-header-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 0;
-      flex: 1;
-    }
-
-    .mbu-overlay-title {
-      font-size: 13px;
-      font-weight: 750;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .mbu-overlay-chip {
-      margin-left: 8px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid var(--mbu-border);
-      background: color-mix(in oklab, var(--mbu-surface) 60%, transparent);
-      color: var(--mbu-text-muted);
-      font-weight: 650;
-    }
-
-    .mbu-overlay-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-	    .mbu-overlay-action {
-	      appearance: none;
-	      border: 1px solid var(--mbu-border);
-	      background: color-mix(in oklab, var(--mbu-surface) 92%, transparent);
-	      color: var(--mbu-text);
-	      border-radius: 10px;
-	      height: 32px;
-	      padding: 0 10px;
-	      font-size: 12px;
-	      line-height: 1;
-	      cursor: pointer;
-	      font-weight: 700;
-	      display: inline-flex;
-	      align-items: center;
-	      justify-content: center;
-	      gap: 6px;
-	    }
-	    .mbu-overlay-action:disabled {
-	      opacity: 0.6;
-	      cursor: not-allowed;
-	    }
-
-	    .mbu-overlay-icon-button {
-	      width: 32px;
-	      padding: 0;
-	      flex: 0 0 auto;
-	    }
-
-	    .mbu-overlay-copy {
-	      width: 28px;
-	      height: 28px;
-	      border-radius: 9px;
-	      margin-left: auto;
-	      color: var(--mbu-text-muted);
-	      background: color-mix(in oklab, var(--mbu-surface) 96%, transparent);
-	      transition:
-	        background 140ms ease,
-	        border-color 140ms ease,
-	        color 140ms ease;
-	    }
-
-	    .mbu-overlay-copy:hover:not(:disabled) {
-	      border-color: color-mix(in oklab, var(--mbu-accent) 45%, var(--mbu-border));
-	      background: color-mix(in oklab, var(--mbu-accent) 10%, var(--mbu-surface));
-	      color: var(--mbu-text);
-	    }
-
-	    .mbu-overlay-icon-button svg {
-	      width: 16px;
-	      height: 16px;
-	      stroke: currentColor;
-	      fill: none;
-	      stroke-width: 2.2;
-	      stroke-linecap: round;
-	      stroke-linejoin: round;
-	    }
-
-	    .mbu-overlay-icon-button.mbu-overlay-copy svg {
-	      width: 14px;
-	      height: 14px;
-	      stroke-width: 2;
-	    }
-
-	    .mbu-overlay-icon-button[data-active='true'] {
-	      border-color: color-mix(in oklab, var(--mbu-accent) 55%, var(--mbu-border));
-	      background: color-mix(in oklab, var(--mbu-accent) 14%, var(--mbu-surface));
-	    }
-
-	    .mbu-overlay-primary {
-	      border-color: color-mix(in oklab, var(--mbu-accent) 55%, var(--mbu-border));
-	      background: color-mix(in oklab, var(--mbu-accent) 14%, var(--mbu-surface));
-	    }
-
-    .mbu-overlay-drag {
-      appearance: none;
-      border: 1px solid var(--mbu-border);
-      background: color-mix(in oklab, var(--mbu-surface) 85%, transparent);
-      color: var(--mbu-text);
-      width: 32px;
-      height: 32px;
-      padding: 0;
-      border-radius: 10px;
-      cursor: grab;
-      touch-action: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 auto;
-    }
-    .mbu-overlay-drag:active {
-      cursor: grabbing;
-    }
-
-    .mbu-overlay-body {
-      padding: 12px;
-      overflow: auto;
-      display: grid;
-      gap: 10px;
-    }
-
-    .mbu-overlay-body-actions {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .mbu-overlay-primary-block {
-      position: relative;
-    }
-
-    .mbu-overlay-primary-block .mbu-overlay-copy {
-      position: absolute;
-      top: 2px;
-      right: 2px;
-      margin-left: 0;
-    }
-
-    .mbu-overlay-primary-block .mbu-overlay-primary-text {
-      padding-right: 44px;
-    }
-
-    .mbu-overlay-status {
-      font-size: 12px;
-      font-weight: 750;
-      color: var(--mbu-text-muted);
-    }
-
-    .mbu-overlay-primary-text,
-    .mbu-overlay-secondary-text {
-      margin: 0;
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    .mbu-overlay-secondary-text {
-      color: var(--mbu-text-muted);
-      font-size: 12px;
-    }
-
-    .mbu-overlay-event-table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      border: 1px solid var(--mbu-border);
-      border-radius: 12px;
-      background: color-mix(in oklab, var(--mbu-surface) 92%, transparent);
-      overflow: hidden;
-      font-size: 12px;
-    }
-
-    .mbu-overlay-event-table th,
-    .mbu-overlay-event-table td {
-      padding: 8px 10px;
-      vertical-align: top;
-      border-bottom: 1px solid var(--mbu-border);
-      text-align: left;
-    }
-
-    .mbu-overlay-event-table tr:last-child th,
-    .mbu-overlay-event-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .mbu-overlay-event-table th {
-      width: 84px;
-      color: var(--mbu-text-muted);
-      font-weight: 750;
-      white-space: nowrap;
-    }
-
-    .mbu-overlay-event-table td {
-      color: var(--mbu-text);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .mbu-overlay-quote {
-      margin: 0;
-      padding: 10px 12px;
-      border: 1px solid var(--mbu-border);
-      border-left: 4px solid color-mix(in oklab, var(--mbu-accent) 60%, var(--mbu-border));
-      border-radius: 12px;
-      background: color-mix(in oklab, var(--mbu-surface) 84%, transparent);
-      color: var(--mbu-text-muted);
-      font-size: 12px;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .mbu-overlay-aux {
-      border: 1px solid var(--mbu-border);
-      border-radius: 12px;
-      background: color-mix(in oklab, var(--mbu-surface) 92%, transparent);
-      overflow: hidden;
-    }
-
-    .mbu-overlay-aux-summary {
-      cursor: pointer;
-      list-style: none;
-      padding: 10px 12px;
-      font-size: 12px;
-      font-weight: 750;
-      color: var(--mbu-text-muted);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .mbu-overlay-aux-summary::-webkit-details-marker {
-      display: none;
-    }
-
-    .mbu-overlay-aux-summary::after {
-      content: '⌄';
-      font-size: 12px;
-      opacity: 0.8;
-      transform: translateY(-1px);
-      transition: transform 140ms ease;
-    }
-
-    .mbu-overlay-aux[open] > .mbu-overlay-aux-summary::after {
-      transform: rotate(180deg) translateY(1px);
-    }
-
-    .mbu-overlay-aux .mbu-overlay-quote {
-      border: none;
-      border-top: 1px solid var(--mbu-border);
-      border-left: 4px solid color-mix(in oklab, var(--mbu-accent) 60%, var(--mbu-border));
-      border-radius: 0 0 12px 12px;
-      background: transparent;
-    }
-  `;
+  // Overlay styles live in src/styles/tokens/components.css
 
   function ensureOverlayMount(): OverlayMount {
     if (globalState.overlayMount?.host.isConnected) {
@@ -676,24 +390,10 @@ import { createNotifications, type Notifier, ToastHost, type ToastManager } from
     const existing = document.getElementById(OVERLAY_HOST_ID) as HTMLDivElement | null;
     const host = existing || document.createElement('div');
     host.id = OVERLAY_HOST_ID;
-    host.style.cssText = `
-      all: initial;
-      position: fixed;
-      top: 16px;
-      left: 16px;
-      z-index: 2147483647;
-      color-scheme: light;
-    `;
 
     const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
     ensureShadowUiBaseStyles(shadow);
-
-    if (!shadow.querySelector(`#${OVERLAY_STYLE_ID}`)) {
-      const style = document.createElement('style');
-      style.id = OVERLAY_STYLE_ID;
-      style.textContent = OVERLAY_CSS;
-      shadow.appendChild(style);
-    }
+    applyTheme(currentTheme, shadow);
 
     let rootEl = shadow.getElementById(OVERLAY_ROOT_ID) as HTMLDivElement | null;
     if (!rootEl) {
@@ -967,18 +667,25 @@ import { createNotifications, type Notifier, ToastHost, type ToastManager } from
 
   if (chrome.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== 'sync') return;
+      if (areaName === 'sync') {
+        if ('contextActions' in changes) {
+          summarizeOverlayTitleCache = null;
+          summarizeOverlayTitleInFlight = null;
+        }
 
-      if ('contextActions' in changes) {
-        summarizeOverlayTitleCache = null;
-        summarizeOverlayTitleInFlight = null;
+        if (!('domainPatterns' in changes || 'autoEnableSort' in changes)) return;
+        void (async () => {
+          await refreshTableConfig();
+          maybeEnableTableSortFromConfig();
+        })();
+        return;
       }
 
-      if (!('domainPatterns' in changes || 'autoEnableSort' in changes)) return;
-      void (async () => {
-        await refreshTableConfig();
-        maybeEnableTableSortFromConfig();
-      })();
+      if (areaName !== 'local') return;
+      if (!('theme' in changes)) return;
+      const change = changes.theme as chrome.storage.StorageChange | undefined;
+      currentTheme = normalizeTheme(change?.newValue);
+      applyThemeToMounts(currentTheme);
     });
   }
 

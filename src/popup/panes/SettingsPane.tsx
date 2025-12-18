@@ -8,6 +8,7 @@ import { Toggle } from '@base-ui/react/toggle';
 import { useEffect, useId, useState } from 'react';
 import { DEFAULT_OPENAI_MODEL, normalizeOpenAiModel, OPENAI_MODEL_OPTIONS } from '../../openai/settings';
 import type { LocalStorageData } from '../../storage/types';
+import { applyTheme, isTheme, type Theme } from '../../ui/theme';
 import type { TestOpenAiTokenRequest, TestOpenAiTokenResponse } from '../runtime';
 import type { PopupPaneBaseProps } from './types';
 
@@ -28,19 +29,28 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
   const [showToken, setShowToken] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [model, setModel] = useState(DEFAULT_OPENAI_MODEL);
+  const [theme, setTheme] = useState<Theme>('dark');
   const tokenInputId = useId();
   const modelLabelId = useId();
+  const themeLabelId = useId();
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const data = await props.runtime.storageLocalGet(['openaiApiToken', 'openaiCustomPrompt', 'openaiModel']);
+        const data = await props.runtime.storageLocalGet([
+          'openaiApiToken',
+          'openaiCustomPrompt',
+          'openaiModel',
+          'theme',
+        ]);
         const raw = data as Partial<LocalStorageData>;
         if (cancelled) return;
         setToken(raw.openaiApiToken ?? '');
         setCustomPrompt(raw.openaiCustomPrompt ?? '');
         setModel(normalizeOpenAiModel(raw.openaiModel));
+        setTheme(isTheme(raw.theme) ? raw.theme : 'dark');
+        applyTheme(isTheme(raw.theme) ? raw.theme : 'dark', document);
       } catch {
         // no-op
       }
@@ -127,6 +137,27 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
     try {
       await props.runtime.storageLocalRemove('openaiModel');
       setModel(DEFAULT_OPENAI_MODEL);
+      props.notify.success('デフォルトに戻しました');
+    } catch {
+      props.notify.error('変更に失敗しました');
+    }
+  };
+
+  const saveTheme = async (): Promise<void> => {
+    if (!isTheme(theme)) return;
+    try {
+      await props.runtime.storageLocalSet({ theme });
+      props.notify.success('保存しました');
+    } catch {
+      props.notify.error('保存に失敗しました');
+    }
+  };
+
+  const resetTheme = async (): Promise<void> => {
+    try {
+      await props.runtime.storageLocalRemove('theme');
+      setTheme('dark');
+      applyTheme('dark', document);
       props.notify.success('デフォルトに戻しました');
     } catch {
       props.notify.error('変更に失敗しました');
@@ -258,6 +289,62 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
             onClick={() => void resetModel()}
             type="button"
           >
+            デフォルトに戻す
+          </Button>
+        </div>
+      </Form>
+
+      <Separator className="mbu-separator" />
+
+      <Form
+        className="stack"
+        onFormSubmit={() => {
+          void saveTheme();
+        }}
+      >
+        <Fieldset.Root className="mbu-fieldset stack">
+          <Fieldset.Legend className="mbu-fieldset-legend">テーマ</Fieldset.Legend>
+          <div className="field">
+            <span className="field-name" id={themeLabelId}>
+              テーマ
+            </span>
+            <Select.Root
+              onValueChange={value => {
+                if (!isTheme(value)) return;
+                setTheme(value);
+                applyTheme(value, document);
+              }}
+              value={theme}
+            >
+              <Select.Trigger aria-labelledby={themeLabelId} className="token-input mbu-select-trigger" type="button">
+                <Select.Value className="mbu-select-value" />
+                <Select.Icon className="mbu-select-icon">▾</Select.Icon>
+              </Select.Trigger>
+              <Select.Portal>
+                <Select.Positioner className="mbu-select-positioner" sideOffset={6}>
+                  <Select.Popup className="mbu-select-popup">
+                    <Select.List className="mbu-select-list">
+                      <Select.Item className="mbu-select-item" value="dark">
+                        <Select.ItemText>ダーク</Select.ItemText>
+                        <Select.ItemIndicator className="mbu-select-indicator">✓</Select.ItemIndicator>
+                      </Select.Item>
+                      <Select.Item className="mbu-select-item" value="light">
+                        <Select.ItemText>ライト</Select.ItemText>
+                        <Select.ItemIndicator className="mbu-select-indicator">✓</Select.ItemIndicator>
+                      </Select.Item>
+                    </Select.List>
+                  </Select.Popup>
+                </Select.Positioner>
+              </Select.Portal>
+            </Select.Root>
+          </div>
+        </Fieldset.Root>
+
+        <div className="button-row">
+          <Button className="btn btn-primary btn-small" onClick={() => void saveTheme()} type="button">
+            保存
+          </Button>
+          <Button className="btn btn-ghost btn-small" onClick={() => void resetTheme()} type="button">
             デフォルトに戻す
           </Button>
         </div>

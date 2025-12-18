@@ -27,3 +27,20 @@ table[data-sortable][data-sort-order="desc"] th:hover::after {
   content: "↓";
   opacity: 0.7;
 }
+
+/* Overlay/Toast hosts (ShadowRoot containers) */
+#my-browser-utils-overlay,
+#my-browser-utils-toast-host {
+  position: fixed;
+  z-index: 2147483647;
+}
+
+#my-browser-utils-overlay {
+  top: 16px;
+  left: 16px;
+}
+
+#my-browser-utils-toast-host {
+  top: 0;
+  left: 0;
+}

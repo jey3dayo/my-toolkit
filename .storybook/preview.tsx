@@ -1,8 +1,6 @@
 import type { Preview } from '@storybook/react-vite';
 import { ensurePopupUiBaseStyles } from '../src/ui/styles';
 
-import '../popup.css';
-
 const preview: Preview = {
   parameters: {
     controls: {

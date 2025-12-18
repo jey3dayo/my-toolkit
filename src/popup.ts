@@ -1,11 +1,25 @@
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PopupApp } from './popup/App';
+import { createPopupRuntime } from './popup/runtime';
 import { ensurePopupUiBaseStyles } from './ui/styles';
+import { applyTheme, isTheme } from './ui/theme';
+
+async function initTheme(): Promise<void> {
+  const runtime = createPopupRuntime();
+  try {
+    const { theme } = await runtime.storageLocalGet(['theme']);
+    applyTheme(isTheme(theme) ? theme : 'dark', document);
+  } catch {
+    applyTheme('dark', document);
+  }
+}
 
 (() => {
   const start = (): void => {
     ensurePopupUiBaseStyles(document);
+    applyTheme('dark', document);
+    void initTheme();
 
     const isExtensionPage = window.location.protocol === 'chrome-extension:';
     if (isExtensionPage) {

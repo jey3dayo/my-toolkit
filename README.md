@@ -74,7 +74,14 @@ my-browser-utils/
 │   └── popup.ts        # ポップアップロジック
 ├── content.css         # コンテンツスクリプト用スタイル
 ├── popup.html          # ポップアップUI
-└── popup.css           # ポップアップスタイル
+└── src/styles/         # ポップアップ/共通UIスタイル（Design Tokens）
+    ├── base.css
+    ├── layout.css
+    ├── utilities.css
+    └── tokens/
+        ├── primitives.css
+        ├── semantic.css
+        └── components.css
 ```
 
 ## 開発
@@ -82,6 +89,10 @@ my-browser-utils/
 ### 開発ルール
 
 `.claude/rules/development.md` を参照してください。
+
+### スタイル管理
+
+Design Tokens とテーマ切り替えの方針は `docs/style-management.md` を参照してください。
 
 ### アイコン更新
 
