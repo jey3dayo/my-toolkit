@@ -15,6 +15,8 @@ const BASE_CSS = `
   --mbu-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   --mbu-focus-ring: 2px solid rgba(123, 220, 247, 0.55);
   --mbu-focus-ring-offset: 2px;
+  --mbu-toast-screen-inset: 12px 12px auto auto;
+  --mbu-toast-surface-inset: 12px 12px auto auto;
   color-scheme: dark;
 }
 
@@ -31,6 +33,8 @@ const BASE_CSS = `
   --mbu-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
   --mbu-focus-ring: 2px solid rgba(66, 133, 244, 0.65);
   --mbu-focus-ring-offset: 2px;
+  --mbu-toast-screen-inset: 12px 12px auto auto;
+  --mbu-toast-surface-inset: auto 12px 12px auto;
   color-scheme: light;
 }
 
@@ -45,8 +49,7 @@ const BASE_CSS = `
 
 .mbu-toast-viewport {
   position: fixed;
-  top: 12px;
-  right: 12px;
+  inset: var(--mbu-toast-screen-inset, 12px 12px auto auto);
   z-index: 2147483647;
   display: flex;
   flex-direction: column;
@@ -56,6 +59,7 @@ const BASE_CSS = `
 
 .mbu-toast-viewport[data-placement='surface'] {
   position: absolute;
+  inset: var(--mbu-toast-surface-inset, 12px 12px auto auto);
 }
 
 .mbu-toast-viewport[data-placement='surface'] .mbu-toast-root {
@@ -130,11 +134,9 @@ export function ensurePopupUiBaseStyles(doc: Document): void {
   const popupOverrides = doc.createElement('style');
   popupOverrides.id = POPUP_STYLE_ID;
   popupOverrides.textContent = `
-  body { position: relative; }
-  .mbu-toast-viewport {
-    position: fixed;
-    top: 12px;
-    right: 12px;
+  body {
+    position: relative;
+    --mbu-toast-surface-inset: 12px calc(var(--rail, 0px) + 12px) auto auto;
   }
   `;
   (doc.head ?? doc.documentElement).appendChild(popupOverrides);

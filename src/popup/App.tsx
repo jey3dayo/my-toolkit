@@ -73,7 +73,7 @@ export function PopupApp(): React.JSX.Element {
       value={tabValue}
     >
       <div className="app-shell mbu-surface">
-        <ToastHost portalContainer={document.body} toastManager={notifications.toastManager} />
+        <ToastHost placement="surface" portalContainer={document.body} toastManager={notifications.toastManager} />
         <main className="content">
           <header className="content-header">
             <div className="title-block">
