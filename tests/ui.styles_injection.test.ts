@@ -5,7 +5,7 @@ describe('UI base styles', () => {
   it('injects popup base styles once', () => {
     ensurePopupUiBaseStyles(document);
     expect(document.getElementById('mbu-ui-base-styles')).not.toBeNull();
-    expect(document.getElementById('mbu-ui-popup-overrides')?.textContent ?? '').toContain('right: 12px');
+    expect(document.getElementById('mbu-ui-popup-overrides')?.textContent ?? '').toContain('--mbu-toast-surface-inset');
 
     const before = document.querySelectorAll('#mbu-ui-base-styles').length;
     ensurePopupUiBaseStyles(document);
