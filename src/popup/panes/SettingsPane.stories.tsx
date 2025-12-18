@@ -3,12 +3,11 @@ import { useRef } from 'react';
 
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
-import type { Notifier } from '../../ui/toast';
-import type { PopupRuntime } from '../runtime';
 import { createStoryPopupRuntime } from '../storybook/createStoryPopupRuntime';
 import { SettingsPane } from './SettingsPane';
+import type { PopupPaneBaseProps } from './types';
 
-function SettingsPaneStory(props: { runtime: PopupRuntime; notify: Notifier }): React.JSX.Element {
+function SettingsPaneStory(props: PopupPaneBaseProps): React.JSX.Element {
   const tokenInputRef = useRef<HTMLInputElement | null>(null);
   return <SettingsPane notify={props.notify} runtime={props.runtime} tokenInputRef={tokenInputRef} />;
 }

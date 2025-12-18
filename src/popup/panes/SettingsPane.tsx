@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
 import { DEFAULT_OPENAI_MODEL, normalizeOpenAiModel, OPENAI_MODEL_OPTIONS } from '../../openai/settings';
 import type { LocalStorageData } from '../../storage/types';
-import type { Notifier } from '../../ui/toast';
-import type { PopupRuntime, TestOpenAiTokenRequest, TestOpenAiTokenResponse } from '../runtime';
+import type { TestOpenAiTokenRequest, TestOpenAiTokenResponse } from '../runtime';
+import type { PopupPaneBaseProps } from './types';
 
-type Props = {
-  runtime: PopupRuntime;
-  notify: Notifier;
+export type SettingsPaneProps = PopupPaneBaseProps & {
   tokenInputRef: React.RefObject<HTMLInputElement | null>;
 };
 
@@ -18,7 +16,7 @@ function isTestOpenAiTokenResponse(value: unknown): value is TestOpenAiTokenResp
   return typeof (value as { error?: unknown }).error === 'string';
 }
 
-export function SettingsPane(props: Props): React.JSX.Element {
+export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
   const [token, setToken] = useState('');
   const [showToken, setShowToken] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');

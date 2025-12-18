@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { Notifier } from '../../ui/toast';
-import type { EnableTableSortMessage, PopupRuntime } from '../runtime';
+import type { EnableTableSortMessage } from '../runtime';
+import type { PopupPaneBaseProps } from './types';
 
-type Props = {
-  runtime: PopupRuntime;
-  notify: Notifier;
-};
+export type TablePaneProps = PopupPaneBaseProps;
 
 function normalizePatterns(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -15,7 +12,7 @@ function normalizePatterns(value: unknown): string[] {
     .slice(0, 200);
 }
 
-export function TablePane(props: Props): React.JSX.Element {
+export function TablePane(props: TablePaneProps): React.JSX.Element {
   const [autoEnable, setAutoEnable] = useState(false);
   const [patterns, setPatterns] = useState<string[]>([]);
   const [patternInput, setPatternInput] = useState('');

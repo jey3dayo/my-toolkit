@@ -2,12 +2,11 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
-import type { Notifier } from '../../ui/toast';
-import type { PopupRuntime } from '../runtime';
 import { createStoryPopupRuntime } from '../storybook/createStoryPopupRuntime';
 import { TablePane } from './TablePane';
+import type { PopupPaneBaseProps } from './types';
 
-function TablePaneStory(props: { runtime: PopupRuntime; notify: Notifier }): React.JSX.Element {
+function TablePaneStory(props: PopupPaneBaseProps): React.JSX.Element {
   return <TablePane notify={props.notify} runtime={props.runtime} />;
 }
 

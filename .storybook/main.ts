@@ -8,5 +8,11 @@ const config: StorybookConfig = {
     { from: '../icons', to: '/icons' },
     { from: '../images', to: '/images' },
   ],
+  async viteFinal(config) {
+    config.optimizeDeps ??= {};
+    const include = Array.isArray(config.optimizeDeps.include) ? config.optimizeDeps.include : [];
+    config.optimizeDeps.include = Array.from(new Set([...include, 'date-fns']));
+    return config;
+  },
 };
 export default config;

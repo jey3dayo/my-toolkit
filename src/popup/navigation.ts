@@ -103,71 +103,88 @@ type MenuDrawerApi = {
   isOpen: () => boolean;
 };
 
+function isMenuOpen(elements: NavigationElements): boolean {
+  return elements.body.classList.contains('menu-open');
+}
+
+function applyMenuOpenState(elements: NavigationElements, open: boolean): void {
+  elements.body.classList.toggle('menu-open', open);
+  if (elements.sidebarToggle) {
+    elements.sidebarToggle.setAttribute('aria-pressed', open ? 'true' : 'false');
+    elements.sidebarToggle.title = open ? 'メニューを閉じる' : 'メニュー';
+  }
+  if (elements.menuDrawer) {
+    elements.menuDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+    // ドロワーが閉じている間はフォーカスできないようにする（aria-hidden警告を避ける）
+    elements.menuDrawer.toggleAttribute('inert', !open);
+  }
+}
+
+function focusFirstItemInMenuSoon(env: PopupNavigationEnvironment, elements: NavigationElements): void {
+  env.window.setTimeout(() => {
+    const focusTarget =
+      elements.menuClose ||
+      (elements.menuDrawer?.querySelector<HTMLElement>('a[href],button,[tabindex]:not([tabindex="-1"])') ?? null);
+    focusTarget?.focus();
+  }, 0);
+}
+
+function moveFocusOutOfMenuIfNeeded(env: PopupNavigationEnvironment, elements: NavigationElements): void {
+  // aria-hidden を付与する前にフォーカスを外へ退避させる（警告回避）
+  const active = env.document.activeElement;
+  if (!(active instanceof HTMLElement)) return;
+  if (!elements.menuDrawer?.contains(active)) return;
+
+  const body = elements.body;
+  const prevTabIndex = body.getAttribute('tabindex');
+  body.setAttribute('tabindex', '-1');
+  body.focus();
+  if (prevTabIndex === null) {
+    body.removeAttribute('tabindex');
+  } else {
+    body.setAttribute('tabindex', prevTabIndex);
+  }
+}
+
+function restoreFocusAfterCloseSoon(
+  env: PopupNavigationEnvironment,
+  elements: NavigationElements,
+  lastActiveElement: HTMLElement | null,
+): void {
+  env.window.setTimeout(() => {
+    let focusTarget = lastActiveElement;
+    if (focusTarget && !focusTarget.isConnected) {
+      focusTarget = null;
+    }
+    if (focusTarget && elements.menuDrawer?.contains(focusTarget)) {
+      focusTarget = null;
+    }
+    if (!focusTarget) {
+      focusTarget = elements.sidebarToggle;
+    }
+    focusTarget?.focus();
+  }, 0);
+}
+
 function setupMenuDrawer(env: PopupNavigationEnvironment, elements: NavigationElements): MenuDrawerApi {
   let lastActiveElement: HTMLElement | null = null;
 
-  const isOpen = (): boolean => elements.body.classList.contains('menu-open');
-
-  const applyOpen = (open: boolean): void => {
-    elements.body.classList.toggle('menu-open', open);
-    if (elements.sidebarToggle) {
-      elements.sidebarToggle.setAttribute('aria-pressed', open ? 'true' : 'false');
-      elements.sidebarToggle.title = open ? 'メニューを閉じる' : 'メニュー';
-    }
-    if (elements.menuDrawer) {
-      elements.menuDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
-      // ドロワーが閉じている間はフォーカスできないようにする（aria-hidden警告を避ける）
-      elements.menuDrawer.toggleAttribute('inert', !open);
-    }
-  };
-
   const openMenu = (): void => {
-    if (isOpen()) return;
+    if (isMenuOpen(elements)) return;
     lastActiveElement = env.document.activeElement instanceof HTMLElement ? env.document.activeElement : null;
-    applyOpen(true);
-    env.window.setTimeout(() => {
-      const focusTarget =
-        elements.menuClose ||
-        (elements.menuDrawer?.querySelector<HTMLElement>('a[href],button,[tabindex]:not([tabindex="-1"])') ?? null);
-      focusTarget?.focus();
-    }, 0);
+    applyMenuOpenState(elements, true);
+    focusFirstItemInMenuSoon(env, elements);
   };
 
   const closeMenu = (): void => {
-    if (!isOpen()) return;
-    // aria-hidden を付与する前にフォーカスを外へ退避させる（警告回避）
-    const active = env.document.activeElement;
-    if (active instanceof HTMLElement && elements.menuDrawer?.contains(active)) {
-      const body = elements.body;
-      const prevTabIndex = body.getAttribute('tabindex');
-      body.setAttribute('tabindex', '-1');
-      body.focus();
-      if (prevTabIndex === null) {
-        body.removeAttribute('tabindex');
-      } else {
-        body.setAttribute('tabindex', prevTabIndex);
-      }
-    }
-
-    applyOpen(false);
-
-    env.window.setTimeout(() => {
-      let focusTarget = lastActiveElement;
-      if (focusTarget && !focusTarget.isConnected) {
-        focusTarget = null;
-      }
-      if (focusTarget && elements.menuDrawer?.contains(focusTarget)) {
-        focusTarget = null;
-      }
-      if (!focusTarget) {
-        focusTarget = elements.sidebarToggle;
-      }
-      focusTarget?.focus();
-    }, 0);
+    if (!isMenuOpen(elements)) return;
+    moveFocusOutOfMenuIfNeeded(env, elements);
+    applyMenuOpenState(elements, false);
+    restoreFocusAfterCloseSoon(env, elements, lastActiveElement);
   };
 
   const toggleMenu = (): void => {
-    if (isOpen()) {
+    if (isMenuOpen(elements)) {
       closeMenu();
       return;
     }
@@ -201,9 +218,9 @@ function setupMenuDrawer(env: PopupNavigationEnvironment, elements: NavigationEl
   });
 
   // 通常ページ（file:// など）で開いた場合は初期状態で閉じておく
-  applyOpen(false);
+  applyMenuOpenState(elements, false);
 
-  return { closeMenu, openMenu, toggleMenu, isOpen };
+  return { closeMenu, openMenu, toggleMenu, isOpen: () => isMenuOpen(elements) };
 }
 
 function setupTabs(env: PopupNavigationEnvironment, elements: NavigationElements, menu: MenuDrawerApi): void {

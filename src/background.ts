@@ -803,54 +803,69 @@ function storageLocalGet(keys: string[]): Promise<unknown> {
   });
 }
 
-function normalizeEvent(event: ExtractedEvent): ExtractedEvent {
-  const title = (event.title ?? '').trim() || '予定';
-  let start = (event.start ?? '').trim();
-  let end = event.end?.trim() || undefined;
-  const location = event.location?.trim() || undefined;
-  const description = event.description?.trim() || undefined;
-  let allDay = event.allDay === true ? true : undefined;
+function normalizeOptionalText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
 
+function splitTextRange(value: string): [string, string] | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const waveMatch = normalized.match(/^(.*?)\s*(?:〜|~|–|—)\s*(.*?)$/);
+  if (waveMatch) return [waveMatch[1].trim(), waveMatch[2].trim()];
+  const dashMatch = normalized.match(/^(.*?)\s+-\s+(.*?)$/);
+  if (dashMatch) return [dashMatch[1].trim(), dashMatch[2].trim()];
+  const timeDashMatch = normalized.match(/^(.+\d{1,2}:\d{2}(?::\d{2})?)\s*-\s*(\d{1,2}:\d{2}(?::\d{2})?)$/);
+  if (timeDashMatch) return [timeDashMatch[1].trim(), timeDashMatch[2].trim()];
+  return null;
+}
+
+type NormalizedEventRange = {
+  start: string;
+  end?: string;
+  allDay?: true;
+};
+
+function normalizeEventRange(start: string, end: string | undefined, allDay: true | undefined): NormalizedEventRange {
   // モデルが `start: "2025-12-16 14:00〜15:00"` のようにレンジを一つの文字列に詰めるケースがあるため補正する。
-  if (!end && start) {
-    const splitRange = (value: string): [string, string] | null => {
-      const normalized = value.trim();
-      if (!normalized) return null;
-      const waveMatch = normalized.match(/^(.*?)\s*(?:〜|~|–|—)\s*(.*?)$/);
-      if (waveMatch) return [waveMatch[1].trim(), waveMatch[2].trim()];
-      const dashMatch = normalized.match(/^(.*?)\s+-\s+(.*?)$/);
-      if (dashMatch) return [dashMatch[1].trim(), dashMatch[2].trim()];
-      const timeDashMatch = normalized.match(/^(.+\d{1,2}:\d{2}(?::\d{2})?)\s*-\s*(\d{1,2}:\d{2}(?::\d{2})?)$/);
-      if (timeDashMatch) return [timeDashMatch[1].trim(), timeDashMatch[2].trim()];
-      return null;
-    };
+  if (end || !start) return { start, end, allDay };
 
-    const parts = splitRange(start);
-    if (parts) {
-      const [left, right] = parts;
+  const parts = splitTextRange(start);
+  if (!parts) return { start, end, allDay };
 
-      // date-only range: "2025-12-16〜2025-12-17"
-      if (parseDateOnlyToYyyyMmDd(left) && parseDateOnlyToYyyyMmDd(right)) {
-        start = left;
-        end = right;
-        allDay = allDay ?? true;
-      } else {
-        // datetime range with time-only end: "2025-12-16 14:00〜15:00"
-        const leftDatePrefix = left.match(
-          /^(\d{4}-\d{1,2}-\d{1,2}|\d{4}\/\d{1,2}\/\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日|\d{1,2}[/-]\d{1,2}|\d{1,2}月\d{1,2}日)\s+/,
-        )?.[1];
-        const rightTimeOnly = right.match(/^(\d{1,2}:\d{2}(?::\d{2})?)$/)?.[1];
+  const [left, right] = parts;
 
-        start = left;
-        if (leftDatePrefix && rightTimeOnly) {
-          end = `${leftDatePrefix} ${rightTimeOnly}`;
-        } else if (parseDateTimeLoose(right)) {
-          end = right;
-        }
-      }
-    }
+  // date-only range: "2025-12-16〜2025-12-17"
+  if (parseDateOnlyToYyyyMmDd(left) && parseDateOnlyToYyyyMmDd(right)) {
+    return { start: left, end: right, allDay: allDay ?? true };
   }
 
+  // datetime range with time-only end: "2025-12-16 14:00〜15:00"
+  const leftDatePrefix = left.match(
+    /^(\d{4}-\d{1,2}-\d{1,2}|\d{4}\/\d{1,2}\/\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日|\d{1,2}[/-]\d{1,2}|\d{1,2}月\d{1,2}日)\s+/,
+  )?.[1];
+  const rightTimeOnly = right.match(/^(\d{1,2}:\d{2}(?::\d{2})?)$/)?.[1];
+
+  if (leftDatePrefix && rightTimeOnly) {
+    return { start: left, end: `${leftDatePrefix} ${rightTimeOnly}`, allDay };
+  }
+  if (parseDateTimeLoose(right)) {
+    return { start: left, end: right, allDay };
+  }
+
+  return { start: left, end, allDay };
+}
+
+function normalizeEvent(event: ExtractedEvent): ExtractedEvent {
+  const title = normalizeOptionalText(event.title) ?? '予定';
+  const rawStart = normalizeOptionalText(event.start) ?? '';
+  const rawEnd = normalizeOptionalText(event.end);
+  const rawAllDay = event.allDay === true ? true : undefined;
+  const location = normalizeOptionalText(event.location);
+  const description = normalizeOptionalText(event.description);
+
+  const { start, end, allDay } = normalizeEventRange(rawStart, rawEnd, rawAllDay);
   return { title, start, end, allDay, location, description };
 }
 
