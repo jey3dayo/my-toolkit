@@ -34,6 +34,9 @@ run = "pnpm run lint"
 description = "Vitestでユニットテストを実行"
 run = "pnpm run test"
 
+[tasks."test:storybook"]
+description = "Storybook(Vitest addon)でコンポーネントテストを実行"
+run = "pnpm run test-storybook"
 [tasks.build]
 description = "TypeScriptをビルド"
 run = "pnpm run build"
@@ -51,10 +54,10 @@ description = "型チェック + Biomeチェックを実行"
 depends = ["lint:types", "lint:biome"]
 
 [tasks.check]
-description = "ローカル確認（lint + test）"
-depends = ["lint", "test"]
+description = "ローカル確認（lint + test + storybook）"
+depends = ["lint", "test", "test:storybook"]
 
 [tasks.ci]
 description = "CI 相当のチェック (lint + build)"
-depends = ["format", "lint", "test", "build"]
+depends = ["format", "lint", "test", "test:storybook", "build"]
 run = "echo '✅ CI checks completed'"
