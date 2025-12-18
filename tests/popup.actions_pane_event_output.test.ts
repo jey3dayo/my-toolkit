@@ -38,13 +38,13 @@ function createPopupDom(url = 'chrome-extension://test/popup.html#pane-actions')
   return new JSDOM(html, { url });
 }
 
-function createChromeStub(overrides?: Partial<ChromeStub>): ChromeStub {
+function createChromeStub(): ChromeStub {
   const runtime = {
     lastError: null as { message: string } | null,
     sendMessage: vi.fn(),
   };
 
-  const chromeStub: ChromeStub = {
+  return {
     runtime,
     storage: {
       sync: {
@@ -71,8 +71,6 @@ function createChromeStub(overrides?: Partial<ChromeStub>): ChromeStub {
       create: vi.fn(),
     },
   };
-
-  return { ...chromeStub, ...overrides };
 }
 
 async function flush(window: Window, times = 5): Promise<void> {
@@ -81,7 +79,7 @@ async function flush(window: Window, times = 5): Promise<void> {
   }
 }
 
-describe('popup context actions (React UI)', () => {
+describe('popup Actions pane: event output actions', () => {
   let dom: JSDOM;
   let chromeStub: ChromeStub;
 
@@ -96,7 +94,7 @@ describe('popup context actions (React UI)', () => {
       const keyList = Array.isArray(keys) ? keys : [String(keys)];
       if (keyList.includes('contextActions')) {
         callback({
-          contextActions: [{ id: 'builtin:summarize', title: '要約', kind: 'text', prompt: '{{text}}' }],
+          contextActions: [{ id: 'builtin:calendar', title: 'カレンダー登録', kind: 'event', prompt: '' }],
         });
         return;
       }
@@ -122,7 +120,14 @@ describe('popup context actions (React UI)', () => {
       chromeStub.runtime.lastError = null;
       const action = (message as { action?: unknown }).action;
       if (action === 'runContextAction') {
-        callback({ ok: true, resultType: 'text', text: 'summary', source: 'selection' });
+        callback({
+          ok: true,
+          resultType: 'event',
+          event: { title: 'ミーティング', start: '2025-01-01', allDay: true },
+          eventText: '予定: ミーティング',
+          calendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
+          source: 'selection',
+        });
         return;
       }
       callback({ ok: true });
@@ -140,6 +145,16 @@ describe('popup context actions (React UI)', () => {
       },
     });
 
+    Object.defineProperty(dom.window.URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:mbu-test'),
+    });
+    Object.defineProperty(dom.window.URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    vi.stubGlobal('URL', dom.window.URL);
+
     await act(async () => {
       await import('../src/popup.ts');
       await flush(dom.window);
@@ -150,88 +165,44 @@ describe('popup context actions (React UI)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('runs builtin:summarize and renders the result + source', async () => {
-    const button = dom.window.document.querySelector<HTMLButtonElement>('button[data-action-id="builtin:summarize"]');
-    expect(button?.textContent).toContain('要約');
-
+  it('opens the calendar URL via chrome.tabs.create', async () => {
+    const runButton = dom.window.document.querySelector<HTMLButtonElement>('button[data-action-id="builtin:calendar"]');
     await act(async () => {
-      button?.click();
+      runButton?.click();
       await flush(dom.window);
     });
 
-    const output = dom.window.document.querySelector<HTMLTextAreaElement>('[data-testid="action-output"]');
-    expect(output?.value).toBe('summary');
+    const openButton = dom.window.document.querySelector<HTMLButtonElement>('[data-testid="open-calendar"]');
+    expect(openButton).not.toBeNull();
 
-    const source = dom.window.document.querySelector('[data-testid="action-source"]');
-    expect(source?.textContent).toBe('選択範囲');
+    await act(async () => {
+      openButton?.click();
+      await flush(dom.window);
+    });
 
-    expect(chromeStub.runtime.sendMessage).toHaveBeenCalled();
+    expect(chromeStub.tabs.create).toHaveBeenCalledWith({
+      url: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
+    });
   });
 
-  it('renders template variable hints', () => {
-    const hints = dom.window.document.querySelector('[data-testid="template-vars"]');
-    expect(hints?.textContent).toContain('{{text}}');
-    expect(hints?.textContent).toContain('{{title}}');
-    expect(hints?.textContent).toContain('{{url}}');
-    expect(hints?.textContent).toContain('{{source}}');
-  });
-
-  it('copies output text to clipboard and shows a success toast', async () => {
-    const button = dom.window.document.querySelector<HTMLButtonElement>('button[data-action-id="builtin:summarize"]');
+  it('downloads an .ics file for event results', async () => {
+    const runButton = dom.window.document.querySelector<HTMLButtonElement>('button[data-action-id="builtin:calendar"]');
     await act(async () => {
-      button?.click();
+      runButton?.click();
       await flush(dom.window);
     });
 
-    const copyButton = dom.window.document.querySelector<HTMLButtonElement>('[data-testid="copy-output"]');
-    expect(copyButton).not.toBeNull();
+    const clickSpy = vi.spyOn(dom.window.HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    const downloadButton = dom.window.document.querySelector<HTMLButtonElement>('[data-testid="download-ics"]');
+    expect(downloadButton).not.toBeNull();
 
     await act(async () => {
-      copyButton?.click();
+      downloadButton?.click();
       await flush(dom.window);
     });
 
-    const clipboard = dom.window.navigator.clipboard as unknown as { writeText: ReturnType<typeof vi.fn> };
-    expect(clipboard.writeText).toHaveBeenCalledWith('summary');
-    expect(dom.window.document.body.textContent).toContain('コピーしました');
-  });
-
-  it('shows an error toast when clipboard write fails and keeps output intact', async () => {
-    const clipboard = dom.window.navigator.clipboard as unknown as { writeText: ReturnType<typeof vi.fn> };
-    clipboard.writeText.mockRejectedValueOnce(new Error('denied'));
-
-    const button = dom.window.document.querySelector<HTMLButtonElement>('button[data-action-id="builtin:summarize"]');
-    await act(async () => {
-      button?.click();
-      await flush(dom.window);
-    });
-
-    const output = dom.window.document.querySelector<HTMLTextAreaElement>('[data-testid="action-output"]');
-    expect(output?.value).toBe('summary');
-
-    const copyButton = dom.window.document.querySelector<HTMLButtonElement>('[data-testid="copy-output"]');
-    await act(async () => {
-      copyButton?.click();
-      await flush(dom.window);
-    });
-
-    expect(dom.window.document.body.textContent).toContain('コピーに失敗しました');
-    expect(output?.value).toBe('summary');
-  });
-
-  it('does not crash when background returns an invalid response', async () => {
-    chromeStub.runtime.sendMessage.mockImplementationOnce((_message: unknown, callback: (resp: unknown) => void) => {
-      chromeStub.runtime.lastError = null;
-      callback(undefined);
-    });
-
-    const button = dom.window.document.querySelector<HTMLButtonElement>('button[data-action-id="builtin:summarize"]');
-    await act(async () => {
-      button?.click();
-      await flush(dom.window);
-    });
-
-    const output = dom.window.document.querySelector<HTMLTextAreaElement>('[data-testid="action-output"]');
-    expect(output?.value).toBe('');
+    expect((URL as unknown as { createObjectURL: ReturnType<typeof vi.fn> }).createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
   });
 });

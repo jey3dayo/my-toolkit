@@ -33,6 +33,7 @@ describe('patternToRegex (src/content.ts)', () => {
   let patternToRegex: (pattern: string) => RegExp;
 
   beforeAll(async () => {
+    vi.resetModules();
     const hooks: ContentTestHooks = {};
     globalThis.__MBU_TEST_HOOKS__ = hooks;
 
