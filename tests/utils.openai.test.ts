@@ -42,13 +42,13 @@ describe("extractOpenAiApiErrorMessage", () => {
 
 describe("fetchOpenAiChatCompletionText", () => {
   it("returns Success when response has content", async () => {
-    const fetchFn = vi.fn(
-      async () =>
-        ({
-          ok: true,
-          status: 200,
-          json: async () => ({ choices: [{ message: { content: "ok" } }] }),
-        }) as unknown as Response
+    const fetchFn = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({ choices: [{ message: { content: "ok" } }] }),
+      } as unknown as Response)
     );
 
     const result = await fetchOpenAiChatCompletionText(
@@ -65,13 +65,12 @@ describe("fetchOpenAiChatCompletionText", () => {
   });
 
   it("returns Failure when content is missing", async () => {
-    const fetchFn = vi.fn(
-      async () =>
-        ({
-          ok: true,
-          status: 200,
-          json: async () => ({ choices: [{ message: {} }] }),
-        }) as unknown as Response
+    const fetchFn = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ choices: [{ message: {} }] }),
+      } as unknown as Response)
     );
 
     const result = await fetchOpenAiChatCompletionText(
@@ -87,13 +86,12 @@ describe("fetchOpenAiChatCompletionText", () => {
   });
 
   it("returns Failure with API message when response not ok", async () => {
-    const fetchFn = vi.fn(
-      async () =>
-        ({
-          ok: false,
-          status: 401,
-          json: async () => ({ error: { message: "invalid token" } }),
-        }) as unknown as Response
+    const fetchFn = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: { message: "invalid token" } }),
+      } as unknown as Response)
     );
 
     const result = await fetchOpenAiChatCompletionText(
@@ -109,15 +107,12 @@ describe("fetchOpenAiChatCompletionText", () => {
   });
 
   it("returns Failure with status when response JSON is not available", async () => {
-    const fetchFn = vi.fn(
-      async () =>
-        ({
-          ok: false,
-          status: 503,
-          json: async () => {
-            throw new Error("boom");
-          },
-        }) as unknown as Response
+    const fetchFn = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 503,
+        json: () => Promise.reject(new Error("boom")),
+      } as unknown as Response)
     );
 
     const result = await fetchOpenAiChatCompletionText(
@@ -133,9 +128,7 @@ describe("fetchOpenAiChatCompletionText", () => {
   });
 
   it("returns Failure when fetch throws", async () => {
-    const fetchFn = vi.fn(async () => {
-      throw new Error("network");
-    });
+    const fetchFn = vi.fn(() => Promise.reject(new Error("network")));
 
     const result = await fetchOpenAiChatCompletionText(
       fetchFn as unknown as typeof fetch,
@@ -152,13 +145,12 @@ describe("fetchOpenAiChatCompletionText", () => {
 
 describe("fetchOpenAiChatCompletionOk", () => {
   it("returns Success on ok response", async () => {
-    const fetchFn = vi.fn(
-      async () =>
-        ({
-          ok: true,
-          status: 200,
-          json: async () => ({}),
-        }) as unknown as Response
+    const fetchFn = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      } as unknown as Response)
     );
 
     const result = await fetchOpenAiChatCompletionOk(
@@ -170,13 +162,12 @@ describe("fetchOpenAiChatCompletionOk", () => {
   });
 
   it("returns Failure on non-ok response", async () => {
-    const fetchFn = vi.fn(
-      async () =>
-        ({
-          ok: false,
-          status: 400,
-          json: async () => ({ error: { message: "bad request" } }),
-        }) as unknown as Response
+    const fetchFn = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: { message: "bad request" } }),
+      } as unknown as Response)
     );
 
     const result = await fetchOpenAiChatCompletionOk(

@@ -8,6 +8,11 @@ import {
   parseISO,
 } from "date-fns";
 
+// Regex patterns at module level for performance (lint/performance/useTopLevelRegex)
+const TZ_OFFSET_NO_COLON_REGEX = /([+-]\d{2})(\d{2})$/;
+const TIME_HHMM_REGEX = /\d{1,2}:\d{2}/;
+const YYYYMMDD_REGEX = /^\d{8}$/;
+
 function normalizeDateTimeInput(value: string): string {
   return value
     .trim()
@@ -18,7 +23,7 @@ function normalizeDateTimeInput(value: string): string {
     .replace(/／/g, "/")
     .replace(/[－‐‑‒–—―]/g, "-")
     .replace(/\s+/g, " ")
-    .replace(/([+-]\d{2})(\d{2})$/, "$1:$2") // +0900 -> +09:00
+    .replace(TZ_OFFSET_NO_COLON_REGEX, "$1:$2") // +0900 -> +09:00
     .replace(
       /(\d{1,2})時(\d{1,2})分?/g,
       (_m, h, m) => `${h}:${String(m).padStart(2, "0")}`
@@ -35,16 +40,22 @@ function parseWithFormats(
   formats: readonly string[]
 ): Date | null {
   for (const fmt of formats) {
-    if (!isMatch(value, fmt)) continue;
+    if (!isMatch(value, fmt)) {
+      continue;
+    }
     const parsed = parse(value, fmt, new Date());
-    if (isValid(parsed)) return parsed;
+    if (isValid(parsed)) {
+      return parsed;
+    }
   }
   return null;
 }
 
 export function parseDateOnlyToYyyyMmDd(value: string): string | null {
   const raw = value.trim();
-  if (!raw) return null;
+  if (!raw) {
+    return null;
+  }
 
   const parsed = parseWithFormats(raw, [
     "yyyy-M-d",
@@ -63,9 +74,11 @@ export function parseDateOnlyToYyyyMmDd(value: string): string | null {
 
 export function parseDateTimeLoose(value: string): Date | null {
   const normalized = normalizeDateTimeInput(value);
-  if (!normalized) return null;
+  if (!normalized) {
+    return null;
+  }
 
-  if (!/\d{1,2}:\d{2}/.test(normalized)) {
+  if (!TIME_HHMM_REGEX.test(normalized)) {
     return null;
   }
 
@@ -73,7 +86,9 @@ export function parseDateTimeLoose(value: string): Date | null {
     ? normalized
     : normalized.replace(" ", "T");
   const parsedIso = parseISO(isoCandidate);
-  if (isValid(parsedIso)) return parsedIso;
+  if (isValid(parsedIso)) {
+    return parsedIso;
+  }
 
   return parseWithFormats(normalized, [
     "yyyy-M-d H:mm",
@@ -112,7 +127,9 @@ export function parseDateTimeLoose(value: string): Date | null {
 }
 
 export function formatUtcDateTimeFromDate(date: Date): string | null {
-  if (Number.isNaN(date.getTime())) return null;
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
   const pad = (n: number): string => String(n).padStart(2, "0");
   return [
     date.getUTCFullYear(),
@@ -127,12 +144,16 @@ export function formatUtcDateTimeFromDate(date: Date): string | null {
 }
 
 export function formatLocalYyyyMmDdFromDate(date: Date): string | null {
-  if (Number.isNaN(date.getTime())) return null;
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
   return format(date, "yyyyMMdd");
 }
 
 function parseYyyyMmDdOrNull(value: string): Date | null {
-  if (!/^\d{8}$/.test(value)) return null;
+  if (!YYYYMMDD_REGEX.test(value)) {
+    return null;
+  }
   const parsed = parse(value, "yyyyMMdd", new Date());
   return isValid(parsed) ? parsed : null;
 }

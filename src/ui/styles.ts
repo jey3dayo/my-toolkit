@@ -18,7 +18,9 @@ function resolveStyleHref(path: string): string {
     const runtime = (
       chrome as unknown as { runtime?: { getURL?: (input: string) => string } }
     ).runtime;
-    if (runtime?.getURL) return runtime.getURL(path);
+    if (runtime?.getURL) {
+      return runtime.getURL(path);
+    }
   } catch {
     // non-extension contexts (tests/storybook)
   }
@@ -30,7 +32,9 @@ function ensureDocumentStylesheet(
   id: string,
   path: string
 ): void {
-  if (doc.getElementById(id)) return;
+  if (doc.getElementById(id)) {
+    return;
+  }
   const link = doc.createElement("link");
   link.id = id;
   link.rel = "stylesheet";
@@ -43,7 +47,9 @@ function ensureShadowStylesheet(
   id: string,
   path: string
 ): void {
-  if (shadowRoot.querySelector(`#${id}`)) return;
+  if (shadowRoot.querySelector(`#${id}`)) {
+    return;
+  }
   const link = shadowRoot.ownerDocument.createElement("link");
   link.id = id;
   link.rel = "stylesheet";

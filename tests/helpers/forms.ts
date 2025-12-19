@@ -41,12 +41,16 @@ export async function selectBaseUiOption(
   await flush(window);
 
   const popup = window.document.querySelector<HTMLElement>(".mbu-select-popup");
-  if (!popup) throw new Error("Select popup not found");
+  if (!popup) {
+    throw new Error("Select popup not found");
+  }
 
   const option = Array.from(
     popup.querySelectorAll<HTMLElement>(".mbu-select-item")
   ).find((item) => item.textContent?.includes(optionText));
-  if (!option) throw new Error(`Select option not found: ${optionText}`);
+  if (!option) {
+    throw new Error(`Select option not found: ${optionText}`);
+  }
 
   // Base UI Select commits selection only when the item is highlighted for mouse interactions.
   option.dispatchEvent(new window.MouseEvent("mousemove", { bubbles: true }));

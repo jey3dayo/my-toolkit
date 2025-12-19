@@ -47,7 +47,7 @@ describe("content overlay (React + Shadow DOM)", () => {
   let listeners: Array<(...args: unknown[]) => unknown>;
   let chromeStub: ChromeStub;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.resetModules();
     (
       globalThis as unknown as { __MBU_CONTENT_STATE__?: unknown }
@@ -62,7 +62,7 @@ describe("content overlay (React + Shadow DOM)", () => {
     Object.defineProperty(dom.window.navigator, "clipboard", {
       configurable: true,
       value: {
-        writeText: vi.fn(async () => undefined),
+        writeText: vi.fn(() => Promise.resolve(undefined)),
       },
     });
 
@@ -112,7 +112,9 @@ describe("content overlay (React + Shadow DOM)", () => {
   it("shows an error toast in the shadow root when clipboard write fails", async () => {
     await import("@/content.ts");
     const [listener] = listeners;
-    if (!listener) throw new Error("missing message listener");
+    if (!listener) {
+      throw new Error("missing message listener");
+    }
 
     const clipboard = dom.window.navigator.clipboard as unknown as {
       writeText: ReturnType<typeof vi.fn>;
@@ -158,7 +160,9 @@ describe("content overlay (React + Shadow DOM)", () => {
   it("hides the copy button while overlay is loading", async () => {
     await import("@/content.ts");
     const [listener] = listeners;
-    if (!listener) throw new Error("missing message listener");
+    if (!listener) {
+      throw new Error("missing message listener");
+    }
 
     await dispatchMessage(
       listener,
@@ -185,7 +189,9 @@ describe("content overlay (React + Shadow DOM)", () => {
   it("does not duplicate the source label in summary overlay titles", async () => {
     await import("@/content.ts");
     const [listener] = listeners;
-    if (!listener) throw new Error("missing message listener");
+    if (!listener) {
+      throw new Error("missing message listener");
+    }
 
     await dispatchMessage(
       listener,
@@ -213,7 +219,9 @@ describe("content overlay (React + Shadow DOM)", () => {
   it("renders event overlay with table + quote, hides link-copy, and keeps pin next to close", async () => {
     await import("@/content.ts");
     const [listener] = listeners;
-    if (!listener) throw new Error("missing message listener");
+    if (!listener) {
+      throw new Error("missing message listener");
+    }
 
     await dispatchMessage(
       listener,
@@ -298,7 +306,9 @@ describe("content overlay (React + Shadow DOM)", () => {
   it("renders selection text as an auxiliary collapsed section in text mode", async () => {
     await import("@/content.ts");
     const [listener] = listeners;
-    if (!listener) throw new Error("missing message listener");
+    if (!listener) {
+      throw new Error("missing message listener");
+    }
 
     await dispatchMessage(
       listener,

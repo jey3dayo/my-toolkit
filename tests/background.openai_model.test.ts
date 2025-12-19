@@ -6,7 +6,7 @@ describe("background: OpenAI model selection", () => {
   let listeners: Array<(...args: unknown[]) => unknown>;
   let chromeStub: ChromeStub;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.resetModules();
     listeners = [];
     chromeStub = createChromeStub({ listeners });
@@ -16,11 +16,15 @@ describe("background: OpenAI model selection", () => {
         chromeStub.runtime.lastError = null;
         const keyList = Array.isArray(keys) ? keys : [String(keys)];
         const items: Record<string, unknown> = {};
-        if (keyList.includes("openaiApiToken"))
+        if (keyList.includes("openaiApiToken")) {
           items.openaiApiToken = "sk-test";
-        if (keyList.includes("openaiCustomPrompt"))
+        }
+        if (keyList.includes("openaiCustomPrompt")) {
           items.openaiCustomPrompt = "";
-        if (keyList.includes("openaiModel")) items.openaiModel = "gpt-4o";
+        }
+        if (keyList.includes("openaiModel")) {
+          items.openaiModel = "gpt-4o";
+        }
         callback(items);
       }
     );
@@ -35,17 +39,18 @@ describe("background: OpenAI model selection", () => {
   it("uses openaiModel from local storage in chat completion requests", async () => {
     let capturedModel: string | null = null;
 
-    const fetchSpy = vi.fn(async (_url: string, options?: unknown) => {
+    const fetchSpy = vi.fn((_url: string, options?: unknown) => {
       const body =
         typeof (options as { body?: unknown })?.body === "string"
           ? (options as { body: string }).body
           : "";
       capturedModel = (JSON.parse(body) as { model?: string }).model ?? null;
-      return {
+      return Promise.resolve({
         ok: true,
         status: 200,
-        json: async () => ({ choices: [{ message: { content: "ok" } }] }),
-      } as unknown;
+        json: () =>
+          Promise.resolve({ choices: [{ message: { content: "ok" } }] }),
+      } as unknown);
     });
 
     vi.stubGlobal("fetch", fetchSpy as unknown as typeof fetch);
@@ -53,7 +58,9 @@ describe("background: OpenAI model selection", () => {
     await import("@/background.ts");
 
     const [listener] = listeners;
-    if (!listener) throw new Error("missing runtime.onMessage listener");
+    if (!listener) {
+      throw new Error("missing runtime.onMessage listener");
+    }
 
     const sendResponse = vi.fn();
     listener(

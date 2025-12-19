@@ -18,6 +18,9 @@ type NavigationElements = {
   menuClose: HTMLButtonElement | null;
 };
 
+// Regex patterns at module level for performance (lint/performance/useTopLevelRegex)
+const HASH_PREFIX_REGEX = /^#/;
+
 function getElements(document: Document): NavigationElements {
   return {
     body: document.body,
@@ -44,7 +47,9 @@ function updateHero(
   activeTargetId?: string
 ): void {
   const { heroChip, ctaPill } = elements;
-  if (!(heroChip && ctaPill)) return;
+  if (!(heroChip && ctaPill)) {
+    return;
+  }
 
   ctaPill.textContent = "";
   ctaPill.hidden = true;
@@ -64,27 +69,33 @@ function resolveTargetId(
   elements: NavigationElements,
   targetId?: string
 ): string | undefined {
-  if (targetId) return targetId;
+  if (targetId) {
+    return targetId;
+  }
   const fromActive = elements.navItems.find((item) =>
     item.classList.contains("active")
   )?.dataset.target;
-  if (fromActive) return fromActive;
+  if (fromActive) {
+    return fromActive;
+  }
   return elements.panes[0]?.id;
 }
 
 function setActive(elements: NavigationElements, targetId?: string): void {
   const resolvedTargetId = resolveTargetId(elements, targetId);
-  if (!resolvedTargetId) return;
+  if (!resolvedTargetId) {
+    return;
+  }
 
-  elements.navItems.forEach((nav) => {
+  for (const nav of elements.navItems) {
     const isActive = nav.dataset.target === resolvedTargetId;
     nav.classList.toggle("active", isActive);
     nav.setAttribute("aria-selected", isActive ? "true" : "false");
-  });
+  }
 
-  elements.panes.forEach((pane) => {
+  for (const pane of elements.panes) {
     pane.classList.toggle("active", pane.id === resolvedTargetId);
-  });
+  }
 
   updateHero(elements, resolvedTargetId);
 
@@ -98,15 +109,21 @@ function getTargetFromHash(
   document: Document,
   window: Window
 ): string | undefined {
-  const hash = window.location.hash.replace(/^#/, "");
-  if (!hash) return;
-  if (!document.getElementById(hash)) return;
+  const hash = window.location.hash.replace(HASH_PREFIX_REGEX, "");
+  if (!hash) {
+    return;
+  }
+  if (!document.getElementById(hash)) {
+    return;
+  }
   return hash;
 }
 
 function safelyReplaceHash(window: Window, nextHash: string): void {
   try {
-    if (window.location.hash === nextHash) return;
+    if (window.location.hash === nextHash) {
+      return;
+    }
     window.history.replaceState(null, "", nextHash);
   } catch {
     window.location.hash = nextHash;
@@ -161,8 +178,12 @@ function moveFocusOutOfMenuIfNeeded(
 ): void {
   // aria-hidden を付与する前にフォーカスを外へ退避させる（警告回避）
   const active = env.document.activeElement;
-  if (!(active instanceof HTMLElement)) return;
-  if (!elements.menuDrawer?.contains(active)) return;
+  if (!(active instanceof HTMLElement)) {
+    return;
+  }
+  if (!elements.menuDrawer?.contains(active)) {
+    return;
+  }
 
   const body = elements.body;
   const prevTabIndex = body.getAttribute("tabindex");
@@ -202,7 +223,9 @@ function setupMenuDrawer(
   let lastActiveElement: HTMLElement | null = null;
 
   const openMenu = (): void => {
-    if (isMenuOpen(elements)) return;
+    if (isMenuOpen(elements)) {
+      return;
+    }
     lastActiveElement =
       env.document.activeElement instanceof HTMLElement
         ? env.document.activeElement
@@ -212,7 +235,9 @@ function setupMenuDrawer(
   };
 
   const closeMenu = (): void => {
-    if (!isMenuOpen(elements)) return;
+    if (!isMenuOpen(elements)) {
+      return;
+    }
     moveFocusOutOfMenuIfNeeded(env, elements);
     applyMenuOpenState(elements, false);
     restoreFocusAfterCloseSoon(env, elements, lastActiveElement);
@@ -239,16 +264,22 @@ function setupMenuDrawer(
   });
 
   env.window.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
+    if (event.key !== "Escape") {
+      return;
+    }
     closeMenu();
   });
 
   // ドロワー内のメニュー選択後は閉じる
   elements.menuDrawer?.addEventListener("click", (event) => {
     const target = event.target as HTMLElement | null;
-    if (!target) return;
+    if (!target) {
+      return;
+    }
     const menuItem = target.closest<HTMLElement>("[data-target]");
-    if (!menuItem) return;
+    if (!menuItem) {
+      return;
+    }
     closeMenu();
   });
 
@@ -268,7 +299,7 @@ function setupTabs(
   elements: NavigationElements,
   menu: MenuDrawerApi
 ): void {
-  elements.navItems.forEach((item) => {
+  for (const item of elements.navItems) {
     item.addEventListener("click", (event) => {
       // ドロワー内/外どちらからでも、タブ切り替え時はメニューを閉じる
       menu.closeMenu();
@@ -284,12 +315,14 @@ function setupTabs(
       event.preventDefault();
 
       const targetId = item.dataset.target;
-      if (!targetId) return;
+      if (!targetId) {
+        return;
+      }
 
       setActive(elements, targetId);
       safelyReplaceHash(env.window, `#${targetId}`);
     });
-  });
+  }
 
   env.window.addEventListener("hashchange", () => {
     menu.closeMenu();

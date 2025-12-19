@@ -45,11 +45,15 @@ function escapeMarkdownLinkText(value: string): string {
 
 export function formatLink(source: LinkSource, format: LinkFormat): string {
   const url = source.url.trim();
-  if (!url) return "";
+  if (!url) {
+    return "";
+  }
 
   const title = source.title.trim();
 
-  if (format === "url") return url;
+  if (format === "url") {
+    return url;
+  }
 
   if (format === "text") {
     return title ? `${title}\n${url}` : url;

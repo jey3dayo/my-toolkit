@@ -74,7 +74,7 @@ function fallbackStorageGet(
   keys: string[]
 ): Record<string, unknown> {
   const data: Record<string, unknown> = {};
-  keys.forEach((key) => {
+  for (const key of keys) {
     let raw: string | null = null;
     try {
       raw = window.localStorage.getItem(
@@ -83,13 +83,15 @@ function fallbackStorageGet(
     } catch {
       raw = null;
     }
-    if (raw === null) return;
+    if (raw === null) {
+      continue;
+    }
     try {
       data[key] = JSON.parse(raw) as unknown;
     } catch {
       data[key] = raw;
     }
-  });
+  }
   return data;
 }
 
@@ -97,7 +99,7 @@ function fallbackStorageSet(
   scope: "sync" | "local",
   items: Record<string, unknown>
 ): void {
-  Object.entries(items).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(items)) {
     try {
       window.localStorage.setItem(
         `${FALLBACK_STORAGE_PREFIX}${scope}:${key}`,
@@ -106,7 +108,7 @@ function fallbackStorageSet(
     } catch {
       // no-op
     }
-  });
+  }
 }
 
 function fallbackStorageRemove(
@@ -114,7 +116,7 @@ function fallbackStorageRemove(
   keys: string[] | string
 ): void {
   const list = Array.isArray(keys) ? keys : [keys];
-  list.forEach((key) => {
+  for (const key of list) {
     try {
       window.localStorage.removeItem(
         `${FALLBACK_STORAGE_PREFIX}${scope}:${key}`
@@ -122,7 +124,7 @@ function fallbackStorageRemove(
     } catch {
       // no-op
     }
-  });
+  }
 }
 
 export function createPopupRuntime(): PopupRuntime {
@@ -251,7 +253,9 @@ export function createPopupRuntime(): PopupRuntime {
     });
     const [tab] = tabs;
     const id = tab?.id;
-    if (id === undefined) return null;
+    if (id === undefined) {
+      return null;
+    }
     return { id, title: tab?.title, url: tab?.url };
   };
 
@@ -306,9 +310,11 @@ export function createPopupRuntime(): PopupRuntime {
 
   const openUrl: PopupRuntime["openUrl"] = (url) => {
     const trimmed = url.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      return;
+    }
     if (isExtensionPage && (chrome as unknown as { tabs?: unknown }).tabs) {
-      void chrome.tabs.create({ url: trimmed });
+      chrome.tabs.create({ url: trimmed });
       return;
     }
     window.open(trimmed, "_blank", "noopener,noreferrer");

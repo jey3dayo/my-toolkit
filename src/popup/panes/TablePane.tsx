@@ -10,7 +10,9 @@ import type { EnableTableSortMessage } from "@/popup/runtime";
 export type TablePaneProps = PopupPaneBaseProps;
 
 function normalizePatterns(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value)) {
+    return [];
+  }
   return value
     .map((item) => (typeof item === "string" ? item.trim() : ""))
     .filter(Boolean)
@@ -24,7 +26,7 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    (async () => {
       try {
         const data = await props.runtime.storageSyncGet([
           "domainPatterns",
@@ -37,7 +39,9 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
       } catch {
         // no-op
       }
-    })();
+    })().catch(() => {
+      // no-op
+    });
     return () => {
       cancelled = true;
     };
@@ -119,7 +123,11 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
         <Button
           className="btn btn-primary"
           data-testid="enable-table-sort"
-          onClick={() => void enableNow()}
+          onClick={() => {
+            enableNow().catch(() => {
+              // no-op
+            });
+          }}
           type="button"
         >
           このタブで有効化
@@ -129,7 +137,11 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
       <Toggle
         className="mbu-toggle-inline"
         data-testid="auto-enable-sort"
-        onPressedChange={(pressed) => void toggleAutoEnable(pressed)}
+        onPressedChange={(pressed) => {
+          toggleAutoEnable(pressed).catch(() => {
+            // no-op
+          });
+        }}
         pressed={autoEnable}
         type="button"
       >
@@ -143,7 +155,9 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
         <Form
           className="pattern-input-group"
           onFormSubmit={() => {
-            void addPattern();
+            addPattern().catch(() => {
+              // no-op
+            });
           }}
         >
           <Input
@@ -157,7 +171,11 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
           <Button
             className="btn btn-ghost btn-small"
             data-testid="pattern-add"
-            onClick={() => void addPattern()}
+            onClick={() => {
+              addPattern().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             追加
@@ -179,7 +197,9 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
                         className="btn-delete"
                         data-pattern-remove={pattern}
                         onClick={() => {
-                          void removePattern(pattern);
+                          removePattern(pattern).catch(() => {
+                            // no-op
+                          });
                         }}
                         type="button"
                       >

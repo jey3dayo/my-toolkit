@@ -13,7 +13,7 @@ import { createPopupDom } from "./helpers/popupDom";
 describe("popup navigation (React + Base UI Tabs)", () => {
   let dom: JSDOM;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.resetModules();
 
     dom = createPopupDom("chrome-extension://test/popup.html#pane-settings");
@@ -28,7 +28,9 @@ describe("popup navigation (React + Base UI Tabs)", () => {
 
   it("derives initial tab from location.hash", async () => {
     const rootEl = dom.window.document.getElementById("root");
-    if (!rootEl) throw new Error("missing #root");
+    if (!rootEl) {
+      throw new Error("missing #root");
+    }
 
     const root = createRoot(rootEl);
     await act(async () => {
@@ -44,14 +46,16 @@ describe("popup navigation (React + Base UI Tabs)", () => {
       dom.window.document.querySelector('[data-pane="pane-actions"]')
     ).toBeNull();
 
-    await act(async () => {
+    act(() => {
       root.unmount();
     });
   });
 
   it("switches tabs and synchronizes hash", async () => {
     const rootEl = dom.window.document.getElementById("root");
-    if (!rootEl) throw new Error("missing #root");
+    if (!rootEl) {
+      throw new Error("missing #root");
+    }
 
     const root = createRoot(rootEl);
     await act(async () => {
@@ -72,14 +76,16 @@ describe("popup navigation (React + Base UI Tabs)", () => {
       dom.window.document.querySelector('[data-pane="pane-table"]')
     ).not.toBeNull();
 
-    await act(async () => {
+    act(() => {
       root.unmount();
     });
   });
 
   it("opens and closes the menu drawer (scrim + Escape)", async () => {
     const rootEl = dom.window.document.getElementById("root");
-    if (!rootEl) throw new Error("missing #root");
+    if (!rootEl) {
+      throw new Error("missing #root");
+    }
 
     const root = createRoot(rootEl);
     await act(async () => {
@@ -124,7 +130,7 @@ describe("popup navigation (React + Base UI Tabs)", () => {
     });
     expect(dom.window.document.querySelector('[role="dialog"]')).toBeNull();
 
-    await act(async () => {
+    act(() => {
       root.unmount();
     });
   });

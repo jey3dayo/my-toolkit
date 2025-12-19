@@ -28,9 +28,12 @@ describe("popup Table Sort pane", () => {
         chromeStub.runtime.lastError = null;
         const keyList = Array.isArray(keys) ? keys : [String(keys)];
         const items: Record<string, unknown> = {};
-        if (keyList.includes("domainPatterns"))
+        if (keyList.includes("domainPatterns")) {
           items.domainPatterns = ["example.com/foo*"];
-        if (keyList.includes("autoEnableSort")) items.autoEnableSort = false;
+        }
+        if (keyList.includes("autoEnableSort")) {
+          items.autoEnableSort = false;
+        }
         callback(items);
       }
     );

@@ -28,11 +28,15 @@ describe("popup Settings pane", () => {
         chromeStub.runtime.lastError = null;
         const keyList = Array.isArray(keys) ? keys : [String(keys)];
         const items: Record<string, unknown> = {};
-        if (keyList.includes("openaiApiToken"))
+        if (keyList.includes("openaiApiToken")) {
           items.openaiApiToken = "sk-existing";
-        if (keyList.includes("openaiCustomPrompt"))
+        }
+        if (keyList.includes("openaiCustomPrompt")) {
           items.openaiCustomPrompt = "prompt";
-        if (keyList.includes("openaiModel")) items.openaiModel = "gpt-4o";
+        }
+        if (keyList.includes("openaiModel")) {
+          items.openaiModel = "gpt-4o";
+        }
         callback(items);
       }
     );

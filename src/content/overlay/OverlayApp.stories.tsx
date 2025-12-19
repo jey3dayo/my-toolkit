@@ -22,7 +22,9 @@ function OverlayAppStory(props: Props): React.JSX.Element {
 
   useLayoutEffect(() => {
     const host = hostRef.current;
-    if (!host) return;
+    if (!host) {
+      return;
+    }
 
     host.id = "my-browser-utils-overlay";
     host.style.position = "fixed";
@@ -38,7 +40,9 @@ function OverlayAppStory(props: Props): React.JSX.Element {
       ? (root as HTMLDivElement)
       : document.createElement("div");
     rootEl.id = "my-browser-utils-overlay-root";
-    if (!root) shadow.appendChild(rootEl);
+    if (!root) {
+      shadow.appendChild(rootEl);
+    }
 
     setMount({ shadow, root: rootEl });
 

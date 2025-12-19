@@ -5,7 +5,7 @@ import { type ChromeStub, createChromeStub } from "./helpers/chromeStub";
 describe("background: context menu", () => {
   let chromeStub: ChromeStub;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.resetModules();
     chromeStub = createChromeStub();
     vi.stubGlobal("chrome", chromeStub);

@@ -29,10 +29,16 @@ export type SettingsPaneProps = PopupPaneBaseProps & {
 function isTestOpenAiTokenResponse(
   value: unknown
 ): value is TestOpenAiTokenResponse {
-  if (typeof value !== "object" || value === null) return false;
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
   const v = value as { ok?: unknown };
-  if (typeof v.ok !== "boolean") return false;
-  if (v.ok) return true;
+  if (typeof v.ok !== "boolean") {
+    return false;
+  }
+  if (v.ok) {
+    return true;
+  }
   return typeof (value as { error?: unknown }).error === "string";
 }
 
@@ -46,7 +52,7 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    (async () => {
       try {
         const data = await props.runtime.storageLocalGet([
           "openaiApiToken",
@@ -55,7 +61,9 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
           "theme",
         ]);
         const raw = data as Partial<LocalStorageData>;
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
         setToken(raw.openaiApiToken ?? "");
         setCustomPrompt(raw.openaiCustomPrompt ?? "");
         setModel(normalizeOpenAiModel(raw.openaiModel));
@@ -64,7 +72,9 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
       } catch {
         // no-op
       }
-    })();
+    })().catch(() => {
+      // no-op
+    });
     return () => {
       cancelled = true;
     };
@@ -159,7 +169,9 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
   };
 
   const saveTheme = async (): Promise<void> => {
-    if (!isTheme(theme)) return;
+    if (!isTheme(theme)) {
+      return;
+    }
     try {
       await props.runtime.storageLocalSet({ theme });
       props.notify.success("保存しました");
@@ -189,7 +201,9 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
       <Form
         className="stack"
         onFormSubmit={() => {
-          void saveToken();
+          saveToken().catch(() => {
+            // no-op
+          });
         }}
       >
         <Fieldset.Root className="mbu-fieldset stack">
@@ -225,7 +239,11 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
           <Button
             className="btn btn-primary btn-small"
             data-testid="token-save"
-            onClick={() => void saveToken()}
+            onClick={() => {
+              saveToken().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             保存
@@ -233,7 +251,11 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
           <Button
             className="btn-delete"
             data-testid="token-clear"
-            onClick={() => void clearToken()}
+            onClick={() => {
+              clearToken().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             削除
@@ -241,7 +263,11 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
           <Button
             className="btn btn-ghost btn-small"
             data-testid="token-test"
-            onClick={() => void testToken()}
+            onClick={() => {
+              testToken().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             トークン確認
@@ -254,7 +280,9 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
       <Form
         className="stack"
         onFormSubmit={() => {
-          void saveModel();
+          saveModel().catch(() => {
+            // no-op
+          });
         }}
       >
         <Fieldset.Root className="mbu-fieldset stack">
@@ -263,7 +291,9 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
           </Fieldset.Legend>
           <Select.Root
             onValueChange={(value) => {
-              if (typeof value === "string") setModel(value);
+              if (typeof value === "string") {
+                setModel(value);
+              }
             }}
             value={model}
           >
@@ -306,7 +336,11 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
           <Button
             className="btn btn-primary btn-small"
             data-testid="model-save"
-            onClick={() => void saveModel()}
+            onClick={() => {
+              saveModel().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             保存
@@ -314,7 +348,11 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
           <Button
             className="btn btn-ghost btn-small"
             data-testid="model-reset"
-            onClick={() => void resetModel()}
+            onClick={() => {
+              resetModel().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             デフォルトに戻す
@@ -327,7 +365,9 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
       <Form
         className="stack"
         onFormSubmit={() => {
-          void saveTheme();
+          saveTheme().catch(() => {
+            // no-op
+          });
         }}
       >
         <Field.Root name="theme">
@@ -337,7 +377,9 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
               <RadioGroup
                 className="mbu-radio-group"
                 onValueChange={(value) => {
-                  if (!isTheme(value)) return;
+                  if (!isTheme(value)) {
+                    return;
+                  }
                   setTheme(value);
                   applyTheme(value, document);
                 }}
@@ -378,14 +420,22 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
         <div className="button-row">
           <Button
             className="btn btn-primary btn-small"
-            onClick={() => void saveTheme()}
+            onClick={() => {
+              saveTheme().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             保存
           </Button>
           <Button
             className="btn btn-ghost btn-small"
-            onClick={() => void resetTheme()}
+            onClick={() => {
+              resetTheme().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             デフォルトに戻す
@@ -398,7 +448,9 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
       <Form
         className="stack"
         onFormSubmit={() => {
-          void savePrompt();
+          savePrompt().catch(() => {
+            // no-op
+          });
         }}
       >
         <Fieldset.Root className="mbu-fieldset stack">
@@ -421,7 +473,11 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
           <Button
             className="btn btn-primary btn-small"
             data-testid="prompt-save"
-            onClick={() => void savePrompt()}
+            onClick={() => {
+              savePrompt().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             保存
@@ -429,7 +485,11 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
           <Button
             className="btn-delete"
             data-testid="prompt-clear"
-            onClick={() => void clearPrompt()}
+            onClick={() => {
+              clearPrompt().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             削除

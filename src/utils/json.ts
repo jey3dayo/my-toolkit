@@ -9,12 +9,16 @@ export function safeParseJsonObject<T>(
     catch: () => "parse-error" as const,
   });
 
-  if (Result.isSuccess(direct)) return direct;
+  if (Result.isSuccess(direct)) {
+    return direct;
+  }
 
   const trimmed = text.trim();
   const start = trimmed.indexOf("{");
   const end = trimmed.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) return direct;
+  if (start === -1 || end === -1 || end <= start) {
+    return direct;
+  }
 
   return Result.try({
     immediate: true,

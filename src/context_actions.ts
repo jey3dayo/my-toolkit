@@ -42,23 +42,35 @@ export const DEFAULT_CONTEXT_ACTIONS: ContextAction[] = [
 ];
 
 function coerceContextAction(value: unknown): ContextAction | null {
-  if (typeof value !== "object" || value === null) return null;
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
   const raw = value as Partial<ContextAction>;
   const id = typeof raw.id === "string" ? raw.id.trim() : "";
   const title = typeof raw.title === "string" ? raw.title.trim() : "";
-  const kind =
-    raw.kind === "event" ? "event" : raw.kind === "text" ? "text" : null;
+  let kind: ContextActionKind | null = null;
+  if (raw.kind === "event") {
+    kind = "event";
+  } else if (raw.kind === "text") {
+    kind = "text";
+  }
   const prompt = typeof raw.prompt === "string" ? raw.prompt : "";
-  if (!(id && title && kind)) return null;
+  if (!(id && title && kind)) {
+    return null;
+  }
   return { id, title, kind, prompt };
 }
 
 export function normalizeContextActions(value: unknown): ContextAction[] {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value)) {
+    return [];
+  }
   const actions: ContextAction[] = [];
   for (const item of value) {
     const action = coerceContextAction(item);
-    if (!action) continue;
+    if (!action) {
+      continue;
+    }
     actions.push(action);
   }
   return actions;

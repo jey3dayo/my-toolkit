@@ -16,6 +16,11 @@ import {
   type ToastManager,
 } from "@/ui/toast";
 
+// Regex patterns at module level for performance (lint/performance/useTopLevelRegex)
+const QUERY_OR_HASH_REGEX = /[?#]/;
+const HTTP_PROTOCOL_REGEX = /^https?:\/\//;
+const SOURCE_SUFFIX_REGEX = /（(?:選択範囲|ページ本文)）\s*$/;
+
 (() => {
   type StorageData = {
     domainPatterns?: string[];
@@ -126,7 +131,7 @@ import {
       .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
       .replace(/\*/g, ".*");
 
-    const shouldAllowQueryHashSuffix = !/[?#]/.test(pattern);
+    const shouldAllowQueryHashSuffix = !QUERY_OR_HASH_REGEX.test(pattern);
     const allowOptionalTrailingSlash =
       shouldAllowQueryHashSuffix &&
       !pattern.endsWith("/") &&
@@ -143,10 +148,13 @@ import {
   }
 
   function matchesAnyPattern(patterns: string[]): boolean {
-    const urlWithoutProtocol = window.location.href.replace(/^https?:\/\//, "");
+    const urlWithoutProtocol = window.location.href.replace(
+      HTTP_PROTOCOL_REGEX,
+      ""
+    );
 
     return patterns.some((pattern) => {
-      const patternWithoutProtocol = pattern.replace(/^https?:\/\//, "");
+      const patternWithoutProtocol = pattern.replace(HTTP_PROTOCOL_REGEX, "");
       const regex = patternToRegex(patternWithoutProtocol);
       return regex.test(urlWithoutProtocol);
     });
@@ -170,7 +178,9 @@ import {
     return;
   }
   globalState.initialized = true;
-  void refreshThemeFromStorage();
+  refreshThemeFromStorage().catch(() => {
+    // no-op
+  });
 
   // ========================================
   // 2. テーブルソート機能
@@ -186,23 +196,26 @@ import {
     table.dataset.sortable = "true";
     const headers = table.querySelectorAll<HTMLTableCellElement>("th");
 
-    headers.forEach((header, index) => {
+    let headerIndex = 0;
+    for (const header of headers) {
+      const columnIndex = headerIndex;
       header.style.cursor = "pointer";
       header.style.userSelect = "none";
       header.title = "クリックでソート";
 
       header.addEventListener("click", () => {
-        sortTable(table, index);
+        sortTable(table, columnIndex);
       });
-    });
+      headerIndex += 1;
+    }
   }
 
   function enableTableSort(): void {
     const tables = document.querySelectorAll<HTMLTableElement>("table");
 
-    tables.forEach((table) => {
+    for (const table of tables) {
       enableSingleTable(table);
-    });
+    }
 
     if (tables.length > 0) {
       showNotification(`${tables.length}個のテーブルでソートを有効化しました`);
@@ -237,7 +250,9 @@ import {
         : bCell.localeCompare(aCell, "ja");
     });
 
-    rows.forEach((row) => targetBody.appendChild(row));
+    for (const row of rows) {
+      targetBody.appendChild(row);
+    }
   }
 
   // ========================================
@@ -272,9 +287,9 @@ import {
     );
 
     if (tables.length > 0) {
-      tables.forEach((table) => {
+      for (const table of tables) {
         enableSingleTable(table);
-      });
+      }
 
       showNotification(
         `${tables.length}個の新しいテーブルでソートを有効化しました`
@@ -298,7 +313,7 @@ import {
   document.addEventListener("mouseup", () => {
     const selectedText = window.getSelection()?.toString().trim() ?? "";
     if (selectedText) {
-      void storageLocalSet({
+      storageLocalSet({
         selectedText,
         selectedTextUpdatedAt: Date.now(),
       }).catch(() => {
@@ -384,47 +399,63 @@ import {
       return { ok: false, error: "コピーに失敗しました" };
     }
   }
+  function buildSelectionTarget(text: string): SummaryTarget {
+    return {
+      text,
+      source: "selection",
+      title: document.title ?? "",
+      url: window.location.href,
+    };
+  }
 
+  function buildPageTarget(text: string): SummaryTarget {
+    return {
+      text,
+      source: "page",
+      title: document.title ?? "",
+      url: window.location.href,
+    };
+  }
+
+  function getLiveSelectionTarget(): SummaryTarget | null {
+    const selection = window.getSelection()?.toString().trim() ?? "";
+    if (!selection) {
+      return null;
+    }
+    return buildSelectionTarget(selection);
+  }
+
+  async function getCachedSelectionTarget(): Promise<SummaryTarget | null> {
+    try {
+      const stored = (await storageLocalGet([
+        "selectedText",
+        "selectedTextUpdatedAt",
+      ])) as {
+        selectedText?: string;
+        selectedTextUpdatedAt?: number;
+      };
+      const selection = stored.selectedText?.trim() ?? "";
+      const updatedAt = stored.selectedTextUpdatedAt ?? 0;
+      const isFresh = Date.now() - updatedAt <= 30_000;
+      if (!(isFresh && selection)) {
+        return null;
+      }
+      return buildSelectionTarget(selection);
+    } catch {
+      return null;
+    }
+  }
   async function getSummaryTargetText(options?: {
     ignoreSelection?: boolean;
   }): Promise<SummaryTarget> {
     if (!options?.ignoreSelection) {
-      const selection = window.getSelection()?.toString().trim() ?? "";
-      if (selection) {
-        return {
-          text: selection,
-          source: "selection",
-          title: document.title ?? "",
-          url: window.location.href,
-        };
+      const selectionTarget = getLiveSelectionTarget();
+      if (selectionTarget) {
+        return selectionTarget;
       }
-
-      let storedSelection: {
-        selectedText?: string;
-        selectedTextUpdatedAt?: number;
-      } = {};
-      try {
-        storedSelection = (await storageLocalGet([
-          "selectedText",
-          "selectedTextUpdatedAt",
-        ])) as {
-          selectedText?: string;
-          selectedTextUpdatedAt?: number;
-        };
-      } catch {
-        storedSelection = {};
-      }
-      const fallbackSelection = storedSelection.selectedText?.trim() ?? "";
-      const updatedAt = storedSelection.selectedTextUpdatedAt ?? 0;
-      const isFresh = Date.now() - updatedAt <= 30_000;
-
-      if (isFresh && fallbackSelection) {
-        return {
-          text: fallbackSelection,
-          source: "selection",
-          title: document.title ?? "",
-          url: window.location.href,
-        };
+      const cachedSelectionTarget = await getCachedSelectionTarget();
+      if (cachedSelectionTarget) {
+        return cachedSelectionTarget;
       }
     }
 
@@ -435,12 +466,7 @@ import {
       normalized.length > MAX_RETURN_CHARS
         ? `${normalized.slice(0, MAX_RETURN_CHARS)}\n\n(以下略)`
         : normalized;
-    return {
-      text: clipped,
-      source: "page",
-      title: document.title ?? "",
-      url: window.location.href,
-    };
+    return buildPageTarget(clipped);
   }
 
   function normalizeText(text: string): string {
@@ -513,9 +539,7 @@ import {
     const range = selection.getRangeAt(0);
     const rects = Array.from(range.getClientRects());
     const rect =
-      rects.length > 0
-        ? rects[rects.length - 1]
-        : range.getBoundingClientRect();
+      rects.length > 0 ? rects.at(-1) : range.getBoundingClientRect();
 
     if (!rect || (rect.width === 0 && rect.height === 0)) {
       return null;
@@ -543,39 +567,44 @@ import {
   }
 
   function stripSourceSuffix(title: string): string {
-    return title.replace(/（(?:選択範囲|ページ本文)）\s*$/, "").trim();
+    return title.replace(SOURCE_SUFFIX_REGEX, "").trim();
   }
 
   let summarizeOverlayTitleCache: string | null = null;
   let summarizeOverlayTitleInFlight: Promise<string> | null = null;
+
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+  }
+
+  function getTrimmedStringProp(
+    record: Record<string, unknown>,
+    key: string
+  ): string {
+    const value = record[key];
+    return typeof value === "string" ? value.trim() : "";
+  }
 
   function findContextActionTitle(actions: unknown, id: string): string | null {
     if (!Array.isArray(actions)) {
       return null;
     }
     for (const item of actions) {
-      if (typeof item !== "object" || item === null) {
+      if (!isRecord(item)) {
         continue;
       }
-      const record = item as Record<string, unknown>;
-      if (typeof record.id !== "string") {
+      if (getTrimmedStringProp(item, "id") !== id) {
         continue;
       }
-      if (record.id.trim() !== id) {
-        continue;
-      }
-      const title = typeof record.title === "string" ? record.title.trim() : "";
-      if (!title) {
-        continue;
-      }
-      return title;
+      const title = getTrimmedStringProp(item, "title");
+      return title || null;
     }
     return null;
   }
 
-  async function getSummarizeOverlayTitle(): Promise<string> {
+  function getSummarizeOverlayTitle(): Promise<string> {
     if (summarizeOverlayTitleCache) {
-      return summarizeOverlayTitleCache;
+      return Promise.resolve(summarizeOverlayTitleCache);
     }
     if (summarizeOverlayTitleInFlight) {
       return summarizeOverlayTitleInFlight;
@@ -602,17 +631,64 @@ import {
     return summarizeOverlayTitleInFlight;
   }
 
+  type ActionOverlayRequest = Extract<
+    ContentRequest,
+    { action: "showActionOverlay" }
+  >;
+
+  function trimmedOrEmpty(value: string | undefined): string {
+    return value?.trim() ?? "";
+  }
+
+  function optionalTrimmed(value: string | undefined): string | undefined {
+    const trimmed = value?.trim() ?? "";
+    return trimmed || undefined;
+  }
+
+  function anchorRectBySource(
+    source: SummarySource
+  ): OverlayViewModel["anchorRect"] {
+    return source === "selection" ? getSelectionAnchorRect() : null;
+  }
+
+  function actionOverlayPrimaryText(
+    status: ActionOverlayRequest["status"],
+    primary: string
+  ): string {
+    if (status === "ready") {
+      return primary || "結果が空でした";
+    }
+    if (status === "error") {
+      return primary || "処理に失敗しました";
+    }
+    return "";
+  }
+
+  function actionOverlaySecondaryText(
+    status: ActionOverlayRequest["status"],
+    secondary: string
+  ): string {
+    return status === "loading"
+      ? secondary || "処理に数秒かかることがあります。"
+      : secondary;
+  }
+
+  function actionOverlayEventPayload(
+    mode: ActionOverlayRequest["mode"],
+    status: ActionOverlayRequest["status"],
+    event: ExtractedEvent | undefined
+  ): ExtractedEvent | undefined {
+    if (!(mode === "event" && status === "ready")) {
+      return;
+    }
+    return event;
+  }
+
   function showActionOverlay(
     request: Extract<ContentRequest, { action: "showActionOverlay" }>
   ): void {
-    const primary = request.primary?.trim() ?? "";
-    const secondary = request.secondary?.trim() ?? "";
-    const calendarUrl = request.calendarUrl?.trim() ?? "";
-    const ics = request.ics?.trim() ?? "";
-    const event = request.event;
-
-    const anchorRect =
-      request.source === "selection" ? getSelectionAnchorRect() : null;
+    const primary = trimmedOrEmpty(request.primary);
+    const secondary = trimmedOrEmpty(request.secondary);
 
     renderOverlay({
       open: true,
@@ -620,22 +696,52 @@ import {
       mode: request.mode,
       source: request.source,
       title: stripSourceSuffix(request.title),
-      primary:
-        request.status === "loading"
-          ? ""
-          : request.status === "ready"
-            ? primary || "結果が空でした"
-            : primary || "処理に失敗しました",
-      secondary:
-        request.status === "loading"
-          ? secondary || "処理に数秒かかることがあります。"
-          : secondary,
-      event:
-        request.mode === "event" && request.status === "ready" && event
-          ? event
-          : undefined,
-      calendarUrl: calendarUrl || undefined,
-      ics: ics || undefined,
+      primary: actionOverlayPrimaryText(request.status, primary),
+      secondary: actionOverlaySecondaryText(request.status, secondary),
+      event: actionOverlayEventPayload(
+        request.mode,
+        request.status,
+        request.event
+      ),
+      calendarUrl: optionalTrimmed(request.calendarUrl),
+      ics: optionalTrimmed(request.ics),
+      anchorRect: anchorRectBySource(request.source),
+    });
+  }
+
+  function renderSummaryOverlayWithTitle(
+    request: Extract<ContentRequest, { action: "showSummaryOverlay" }>,
+    title: string
+  ): void {
+    const summary = request.summary?.trim() ?? "";
+    const error = request.error?.trim() ?? "";
+
+    const anchorRect =
+      request.source === "selection" ? getSelectionAnchorRect() : null;
+
+    let primaryText = "";
+    if (request.status === "ready") {
+      primaryText = summary || "要約結果が空でした";
+    } else if (request.status === "error") {
+      primaryText = error || "要約に失敗しました";
+    }
+
+    let secondaryText = "";
+    if (request.status === "loading") {
+      secondaryText = "処理に数秒かかることがあります。";
+    } else if (request.status === "error") {
+      secondaryText =
+        "OpenAI API Token未設定の場合は、拡張機能のポップアップ「設定」タブで設定してください。";
+    }
+
+    renderOverlay({
+      open: true,
+      status: request.status,
+      mode: "text",
+      source: request.source,
+      title,
+      primary: primaryText,
+      secondary: secondaryText,
       anchorRect,
     });
   }
@@ -644,57 +750,17 @@ import {
     request: Extract<ContentRequest, { action: "showSummaryOverlay" }>
   ): void {
     const fallbackTitle = summarizeOverlayTitleCache ?? "要約";
-    const summary = request.summary?.trim() ?? "";
-    const error = request.error?.trim() ?? "";
+    renderSummaryOverlayWithTitle(request, fallbackTitle);
 
-    const anchorRect =
-      request.source === "selection" ? getSelectionAnchorRect() : null;
-
-    renderOverlay({
-      open: true,
-      status: request.status,
-      mode: "text",
-      source: request.source,
-      title: fallbackTitle,
-      primary:
-        request.status === "ready"
-          ? summary || "要約結果が空でした"
-          : request.status === "error"
-            ? error || "要約に失敗しました"
-            : "",
-      secondary:
-        request.status === "loading"
-          ? "処理に数秒かかることがあります。"
-          : request.status === "error"
-            ? "OpenAI API Token未設定の場合は、拡張機能のポップアップ「設定」タブで設定してください。"
-            : "",
-      anchorRect,
-    });
-
-    void (async () => {
+    (async () => {
       const title = await getSummarizeOverlayTitle();
-      if (title === fallbackTitle) return;
-      renderOverlay({
-        open: true,
-        status: request.status,
-        mode: "text",
-        source: request.source,
-        title,
-        primary:
-          request.status === "ready"
-            ? summary || "要約結果が空でした"
-            : request.status === "error"
-              ? error || "要約に失敗しました"
-              : "",
-        secondary:
-          request.status === "loading"
-            ? "処理に数秒かかることがあります。"
-            : request.status === "error"
-              ? "OpenAI API Token未設定の場合は、拡張機能のポップアップ「設定」タブで設定してください。"
-              : "",
-        anchorRect,
-      });
-    })();
+      if (title === fallbackTitle) {
+        return;
+      }
+      renderSummaryOverlayWithTitle(request, title);
+    })().catch(() => {
+      // no-op
+    });
   }
 
   // ========================================
@@ -720,18 +786,20 @@ import {
           return;
         }
         case "copyToClipboard": {
-          void (async () => {
+          (async () => {
             const result = await copyToClipboard(request.text);
             if (result.ok && request.successMessage?.trim()) {
               const mount = ensureToastMount();
               mount.notify.success(request.successMessage.trim());
             }
             sendResponse(result);
-          })();
+          })().catch(() => {
+            sendResponse({ ok: false, error: "コピーに失敗しました" });
+          });
           return true;
         }
         case "getSummaryTargetText": {
-          void (async () => {
+          (async () => {
             try {
               const target = await getSummaryTargetText({
                 ignoreSelection: request.ignoreSelection,
@@ -745,7 +813,9 @@ import {
                 url: window.location.href,
               } satisfies SummaryTarget);
             }
-          })();
+          })().catch(() => {
+            // no-op
+          });
           return true;
         }
         case "showSummaryOverlay": {
@@ -756,6 +826,10 @@ import {
         case "showActionOverlay": {
           showActionOverlay(request);
           sendResponse({ ok: true });
+          return;
+        }
+        default: {
+          sendResponse({ ok: false });
           return;
         }
       }
@@ -772,7 +846,9 @@ import {
   };
 
   function normalizePatterns(value: unknown): string[] {
-    if (!Array.isArray(value)) return [];
+    if (!Array.isArray(value)) {
+      return [];
+    }
     return value
       .map((item) => (typeof item === "string" ? item.trim() : ""))
       .filter(Boolean);
@@ -808,38 +884,59 @@ import {
     }
   }
 
-  void (async () => {
+  function resetSummarizeOverlayTitleState(): void {
+    summarizeOverlayTitleCache = null;
+    summarizeOverlayTitleInFlight = null;
+  }
+
+  async function refreshTableConfigAndMaybeEnable(): Promise<void> {
     await refreshTableConfig();
     maybeEnableTableSortFromConfig();
-  })();
+  }
+
+  function handleSyncStorageChange(
+    changes: Record<string, chrome.storage.StorageChange>
+  ): void {
+    if ("contextActions" in changes) {
+      resetSummarizeOverlayTitleState();
+    }
+
+    const hasTableConfigChange =
+      "domainPatterns" in changes || "autoEnableSort" in changes;
+    if (!hasTableConfigChange) {
+      return;
+    }
+
+    refreshTableConfigAndMaybeEnable().catch(() => {
+      // no-op
+    });
+  }
+
+  function handleLocalStorageChange(
+    changes: Record<string, chrome.storage.StorageChange>
+  ): void {
+    if (!("theme" in changes)) {
+      return;
+    }
+    const change = changes.theme as chrome.storage.StorageChange | undefined;
+    currentTheme = normalizeTheme(change?.newValue);
+    applyThemeToMounts(currentTheme);
+  }
+
+  refreshTableConfigAndMaybeEnable().catch(() => {
+    // no-op
+  });
 
   if (chrome.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === "sync") {
-        if ("contextActions" in changes) {
-          summarizeOverlayTitleCache = null;
-          summarizeOverlayTitleInFlight = null;
-        }
-
-        if (!("domainPatterns" in changes || "autoEnableSort" in changes)) {
-          return;
-        }
-        void (async () => {
-          await refreshTableConfig();
-          maybeEnableTableSortFromConfig();
-        })();
+        handleSyncStorageChange(changes);
         return;
       }
 
-      if (areaName !== "local") {
-        return;
+      if (areaName === "local") {
+        handleLocalStorageChange(changes);
       }
-      if (!("theme" in changes)) {
-        return;
-      }
-      const change = changes.theme as chrome.storage.StorageChange | undefined;
-      currentTheme = normalizeTheme(change?.newValue);
-      applyThemeToMounts(currentTheme);
     });
   }
 

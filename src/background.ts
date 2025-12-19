@@ -98,8 +98,12 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "sync") return;
-  if (!("contextActions" in changes)) return;
+  if (areaName !== "sync") {
+    return;
+  }
+  if (!("contextActions" in changes)) {
+    return;
+  }
   scheduleRefreshContextMenus();
 });
 
@@ -127,6 +131,242 @@ type OverlayContext = {
   selectionSecondary: string | undefined;
   tokenHintSecondary: string;
 };
+
+type ContextMenuSelectionContext = {
+  selection: string;
+  initialSource: SummarySource;
+  selectionSecondary: string | undefined;
+  tokenHintSecondary: string;
+};
+
+function buildSelectionSecondary(selection: string): string | undefined {
+  const trimmed = selection.trim();
+  if (!trimmed) {
+    return;
+  }
+
+  const clipped =
+    trimmed.length > 4000 ? `${trimmed.slice(0, 4000)}…` : trimmed;
+  return `選択範囲:\n${clipped}`;
+}
+
+function buildContextMenuSelectionContext(
+  info: chrome.contextMenus.OnClickData
+): ContextMenuSelectionContext {
+  const selection = info.selectionText?.trim() ?? "";
+  const initialSource: SummarySource = selection ? "selection" : "page";
+  const selectionSecondary = buildSelectionSecondary(selection);
+  const tokenHintBase =
+    "OpenAI API Token未設定の場合は、拡張機能のポップアップ「設定」タブで設定してください。";
+  const tokenHintSecondary = selectionSecondary
+    ? `${selectionSecondary}\n\n${tokenHintBase}`
+    : tokenHintBase;
+  return { selection, initialSource, selectionSecondary, tokenHintSecondary };
+}
+
+function buildTitleLinkCopyText(tab?: chrome.tabs.Tab): string {
+  const title = tab?.title?.trim() ?? "";
+  const url = tab?.url?.trim() ?? "";
+  if (title && url) {
+    return `${title}\n${url}`;
+  }
+  return url || title;
+}
+
+function buildCopyTitleLinkOverlayTitle(): string {
+  return "タイトルとリンクをコピー";
+}
+
+function buildCopyTitleLinkFallbackSecondary(errorMessage: string): string {
+  return [
+    "自動コピーに失敗しました。上のボタンでコピーしてください。",
+    "",
+    errorMessage,
+  ].join("\n");
+}
+
+async function showCopyTitleLinkOverlay(params: {
+  tabId: number;
+  text: string;
+  secondary: string;
+}): Promise<void> {
+  await sendMessageToTab(params.tabId, {
+    action: "showActionOverlay",
+    status: "ready",
+    mode: "text",
+    source: "page",
+    title: buildCopyTitleLinkOverlayTitle(),
+    primary: params.text,
+    secondary: params.secondary,
+  } satisfies ContentScriptMessage);
+}
+
+async function handleCopyTitleLinkContextMenuClick(params: {
+  tabId: number;
+  tab?: chrome.tabs.Tab;
+}): Promise<void> {
+  const text = buildTitleLinkCopyText(params.tab);
+  if (!text.trim()) {
+    await sendMessageToTab(params.tabId, {
+      action: "showNotification",
+      message: "コピーする内容がありません",
+    } satisfies ContentScriptMessage).catch(() => {
+      // no-op
+    });
+    return;
+  }
+
+  try {
+    const result: { ok: true } | { ok: false; error: string } =
+      await sendMessageToTab(params.tabId, {
+        action: "copyToClipboard",
+        text,
+        successMessage: "コピーしました",
+      } satisfies ContentScriptMessage);
+
+    if (result.ok) {
+      return;
+    }
+
+    await showCopyTitleLinkOverlay({
+      tabId: params.tabId,
+      text,
+      secondary: buildCopyTitleLinkFallbackSecondary(result.error),
+    });
+  } catch (error) {
+    console.error("copy title/link failed:", error);
+    const message =
+      error instanceof Error ? error.message : "コピーに失敗しました";
+    await showCopyTitleLinkOverlay({
+      tabId: params.tabId,
+      text,
+      secondary: message,
+    }).catch(() => {
+      // no-op
+    });
+  }
+}
+
+function titleSuffixBySource(source: SummarySource): string {
+  return source === "selection" ? "選択範囲" : "ページ本文";
+}
+
+async function showContextActionNotFoundOverlay(
+  tabId: number,
+  source: SummarySource
+): Promise<void> {
+  await sendMessageToTab(tabId, {
+    action: "showActionOverlay",
+    status: "error",
+    mode: "text",
+    source,
+    title: "My Browser Utils",
+    primary: "アクションが見つかりません（ポップアップで再保存してください）",
+  });
+}
+
+async function showContextActionLoadingOverlay(
+  tabId: number,
+  action: ContextAction,
+  context: ContextMenuSelectionContext
+): Promise<void> {
+  const titleSuffix = titleSuffixBySource(context.initialSource);
+  await sendMessageToTab(tabId, {
+    action: "showActionOverlay",
+    status: "loading",
+    mode: action.kind === "event" ? "event" : "text",
+    source: context.initialSource,
+    title: `${action.title}（${titleSuffix}）`,
+    secondary: context.selectionSecondary,
+  });
+}
+
+async function resolveTargetFromContextMenuClick(params: {
+  tabId: number;
+  selection: string;
+  tab?: chrome.tabs.Tab;
+}): Promise<SummaryTarget> {
+  if (params.selection) {
+    return {
+      text: params.selection,
+      source: "selection",
+      title: params.tab?.title,
+      url: params.tab?.url,
+    };
+  }
+
+  return await sendMessageToTab(params.tabId, {
+    action: "getSummaryTargetText",
+    ignoreSelection: true,
+  });
+}
+
+function buildResolvedTitle(
+  action: ContextAction,
+  source: SummarySource
+): string {
+  const resolvedSuffix = titleSuffixBySource(source);
+  return `${action.title}（${resolvedSuffix}）`;
+}
+
+async function showContextMenuUnexpectedErrorOverlay(
+  tabId: number,
+  source: SummarySource,
+  error: unknown
+): Promise<void> {
+  const message = error instanceof Error ? error.message : "要約に失敗しました";
+  await sendMessageToTab(tabId, {
+    action: "showActionOverlay",
+    status: "error",
+    mode: "text",
+    source,
+    title: "My Browser Utils",
+    primary: message,
+  }).catch(() => {
+    // コンテンツスクリプトに送れないページでは、黙って諦める
+  });
+}
+
+async function handleContextMenuClick(params: {
+  tabId: number;
+  menuItemId: string;
+  info: chrome.contextMenus.OnClickData;
+  tab?: chrome.tabs.Tab;
+}): Promise<void> {
+  const context = buildContextMenuSelectionContext(params.info);
+  const actionId = params.menuItemId.slice(CONTEXT_MENU_ACTION_PREFIX.length);
+
+  const actions = await ensureContextActionsInitialized();
+  const action = actions.find((item) => item.id === actionId);
+  if (!action) {
+    await showContextActionNotFoundOverlay(params.tabId, context.initialSource);
+    return;
+  }
+
+  await showContextActionLoadingOverlay(params.tabId, action, context);
+
+  const target = await resolveTargetFromContextMenuClick({
+    tabId: params.tabId,
+    selection: context.selection,
+    tab: params.tab,
+  });
+  const resolvedTitle = buildResolvedTitle(action, target.source);
+
+  const overlayContext: OverlayContext = {
+    tabId: params.tabId,
+    action,
+    target,
+    resolvedTitle,
+    selectionSecondary: context.selectionSecondary,
+    tokenHintSecondary: context.tokenHintSecondary,
+  };
+
+  if (action.kind === "event") {
+    await handleEventAction(overlayContext);
+  } else {
+    await handlePromptAction(overlayContext);
+  }
+}
 
 async function handleEventAction(context: OverlayContext): Promise<void> {
   const {
@@ -238,7 +478,9 @@ async function handlePromptAction(context: OverlayContext): Promise<void> {
 
 chrome.contextMenus.onClicked.addListener(
   (info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.Tab) => {
-    if (typeof info.menuItemId !== "string") return;
+    if (typeof info.menuItemId !== "string") {
+      return;
+    }
 
     const tabId = tab?.id;
     if (tabId === undefined) {
@@ -248,150 +490,26 @@ chrome.contextMenus.onClicked.addListener(
     const menuItemId = info.menuItemId;
 
     if (menuItemId === CONTEXT_MENU_COPY_TITLE_LINK_ID) {
-      (async () => {
-        const title = tab?.title?.trim() ?? "";
-        const url = tab?.url?.trim() ?? "";
-        const text = title && url ? `${title}\n${url}` : url || title;
-
-        if (!text.trim()) {
-          await sendMessageToTab(tabId, {
-            action: "showNotification",
-            message: "コピーする内容がありません",
-          } satisfies ContentScriptMessage).catch(() => {
-            // no-op
-          });
-          return;
-        }
-
-        try {
-          const result: { ok: true } | { ok: false; error: string } =
-            await sendMessageToTab(tabId, {
-              action: "copyToClipboard",
-              text,
-              successMessage: "コピーしました",
-            } satisfies ContentScriptMessage);
-
-          if (result.ok) {
-            return;
-          }
-
-          await sendMessageToTab(tabId, {
-            action: "showActionOverlay",
-            status: "ready",
-            mode: "text",
-            source: "page",
-            title: "タイトルとリンクをコピー",
-            primary: text,
-            secondary: [
-              "自動コピーに失敗しました。上のボタンでコピーしてください。",
-              "",
-              result.error,
-            ].join("\n"),
-          } satisfies ContentScriptMessage);
-        } catch (error) {
-          console.error("copy title/link failed:", error);
-          await sendMessageToTab(tabId, {
-            action: "showActionOverlay",
-            status: "ready",
-            mode: "text",
-            source: "page",
-            title: "タイトルとリンクをコピー",
-            primary: text,
-            secondary:
-              error instanceof Error ? error.message : "コピーに失敗しました",
-          } satisfies ContentScriptMessage).catch(() => {
-            // no-op
-          });
-        }
-      })();
+      handleCopyTitleLinkContextMenuClick({ tabId, tab }).catch(() => {
+        // no-op
+      });
       return;
     }
 
-    if (!menuItemId.startsWith(CONTEXT_MENU_ACTION_PREFIX)) return;
+    if (!menuItemId.startsWith(CONTEXT_MENU_ACTION_PREFIX)) {
+      return;
+    }
 
-    (async () => {
-      const selection = info.selectionText?.trim() ?? "";
-      const initialSource: SummarySource = selection ? "selection" : "page";
-      const selectionSecondary = selection
-        ? `選択範囲:\n${selection.length > 4000 ? `${selection.slice(0, 4000)}…` : selection}`
-        : undefined;
-      const tokenHintSecondary = selectionSecondary
-        ? `${selectionSecondary}\n\nOpenAI API Token未設定の場合は、拡張機能のポップアップ「設定」タブで設定してください。`
-        : "OpenAI API Token未設定の場合は、拡張機能のポップアップ「設定」タブで設定してください。";
-      const actionId = menuItemId.slice(CONTEXT_MENU_ACTION_PREFIX.length);
-
-      try {
-        const actions = await ensureContextActionsInitialized();
-        const action = actions.find((item) => item.id === actionId);
-        if (!action) {
-          await sendMessageToTab(tabId, {
-            action: "showActionOverlay",
-            status: "error",
-            mode: "text",
-            source: initialSource,
-            title: "My Browser Utils",
-            primary:
-              "アクションが見つかりません（ポップアップで再保存してください）",
-          });
-          return;
-        }
-
-        const titleSuffix =
-          initialSource === "selection" ? "選択範囲" : "ページ本文";
-        await sendMessageToTab(tabId, {
-          action: "showActionOverlay",
-          status: "loading",
-          mode: action.kind === "event" ? "event" : "text",
-          source: initialSource,
-          title: `${action.title}（${titleSuffix}）`,
-          secondary: selectionSecondary,
-        });
-
-        const target: SummaryTarget = selection
-          ? {
-              text: selection,
-              source: "selection",
-              title: tab?.title,
-              url: tab?.url,
-            }
-          : await sendMessageToTab(tabId, {
-              action: "getSummaryTargetText",
-              ignoreSelection: true,
-            });
-
-        const resolvedSuffix =
-          target.source === "selection" ? "選択範囲" : "ページ本文";
-        const resolvedTitle = `${action.title}（${resolvedSuffix}）`;
-
-        const overlayContext: OverlayContext = {
-          tabId,
-          action,
-          target,
-          resolvedTitle,
-          selectionSecondary,
-          tokenHintSecondary,
-        };
-
-        if (action.kind === "event") {
-          await handleEventAction(overlayContext);
-        } else {
-          await handlePromptAction(overlayContext);
-        }
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "要約に失敗しました";
-        await sendMessageToTab(tabId, {
-          action: "showActionOverlay",
-          status: "error",
-          mode: "text",
-          source: initialSource,
-          title: "My Browser Utils",
-          primary: message,
-        }).catch(() => {
-          // コンテンツスクリプトに送れないページでは、黙って諦める
-        });
-      }
-    })();
+    const selectionContext = buildContextMenuSelectionContext(info);
+    handleContextMenuClick({ tabId, menuItemId, info, tab }).catch((error) => {
+      showContextMenuUnexpectedErrorOverlay(
+        tabId,
+        selectionContext.initialSource,
+        error
+      ).catch(() => {
+        // no-op
+      });
+    });
   }
 );
 
@@ -486,14 +604,16 @@ async function refreshContextMenus(): Promise<void> {
 async function ensureContextActionsInitialized(): Promise<ContextAction[]> {
   const stored = (await storageSyncGet(["contextActions"])) as SyncStorageData;
   const existing = normalizeContextActions(stored.contextActions);
-  if (existing.length > 0) return existing;
+  if (existing.length > 0) {
+    return existing;
+  }
   await storageSyncSet({ contextActions: DEFAULT_CONTEXT_ACTIONS });
   return DEFAULT_CONTEXT_ACTIONS;
 }
 
 // Helper function for handling event actions in message listener
 async function handleEventActionInMessage(
-  tabId: number,
+  _tabId: number,
   target: SummaryTarget,
   action: ContextAction,
   sendResponse: (response: RunContextActionResponse) => void
@@ -552,6 +672,44 @@ async function handlePromptActionInMessage(
     resultType: "text",
     text: result.text,
     source: target.source,
+  });
+}
+
+async function handleSummarizeEventInMessage(
+  target: SummaryTarget,
+  sendResponse: (
+    response:
+      | { ok: false; error: string }
+      | {
+          ok: true;
+          event: ExtractedEvent;
+          calendarUrl: string;
+          eventText: string;
+        }
+  ) => void
+): Promise<void> {
+  const result = await extractEventWithOpenAI(target);
+  if (!result.ok) {
+    sendResponse(result);
+    return;
+  }
+
+  const calendarUrl = buildGoogleCalendarUrl(result.event);
+  if (!calendarUrl) {
+    sendResponse({
+      ok: false,
+      error: `日時の解析に失敗しました（Googleカレンダーリンクを生成できません）\nstart: ${result.event.start}${
+        result.event.end ? `\nend: ${result.event.end}` : ""
+      }`,
+    });
+    return;
+  }
+
+  sendResponse({
+    ok: true,
+    event: result.event,
+    calendarUrl,
+    eventText: formatEventText(result.event),
   });
 }
 
@@ -680,32 +838,8 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (request.action === "summarizeEvent") {
-      (async () => {
-        try {
-          const result = await extractEventWithOpenAI(request.target);
-          if (!result.ok) {
-            sendResponse(result);
-            return;
-          }
-
-          const calendarUrl = buildGoogleCalendarUrl(result.event);
-          if (!calendarUrl) {
-            sendResponse({
-              ok: false,
-              error: `日時の解析に失敗しました（Googleカレンダーリンクを生成できません）\nstart: ${result.event.start}${
-                result.event.end ? `\nend: ${result.event.end}` : ""
-              }`,
-            });
-            return;
-          }
-
-          sendResponse({
-            ok: true,
-            event: result.event,
-            calendarUrl,
-            eventText: formatEventText(result.event),
-          });
-        } catch (error) {
+      handleSummarizeEventInMessage(request.target, sendResponse).catch(
+        (error) => {
           sendResponse({
             ok: false,
             error:
@@ -714,7 +848,7 @@ chrome.runtime.onMessage.addListener(
                 : "イベント要約に失敗しました",
           });
         }
-      })();
+      );
       return true;
     }
 
@@ -842,8 +976,12 @@ async function runPromptActionWithOpenAI(
       : rawText;
 
   const metaLines: string[] = [];
-  if (target.title) metaLines.push(`タイトル: ${target.title}`);
-  if (target.url) metaLines.push(`URL: ${target.url}`);
+  if (target.title) {
+    metaLines.push(`タイトル: ${target.title}`);
+  }
+  if (target.url) {
+    metaLines.push(`URL: ${target.url}`);
+  }
   const meta = metaLines.length > 0 ? `\n\n---\n${metaLines.join("\n")}` : "";
 
   const variables: Record<string, string> = {
@@ -854,9 +992,9 @@ async function runPromptActionWithOpenAI(
   };
 
   let rendered = promptTemplate;
-  Object.entries(variables).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(variables)) {
     rendered = rendered.split(`{{${key}}}`).join(value);
-  });
+  }
 
   const needsText = !promptTemplate.includes("{{text}}");
   const needsMeta = !(
@@ -907,7 +1045,9 @@ function renderInstructionTemplate(
   target: SummaryTarget
 ): string {
   const raw = template.trim();
-  if (!raw) return "";
+  if (!raw) {
+    return "";
+  }
   const shortText = target.text.trim().slice(0, 1200);
   const variables: Record<string, string> = {
     text: shortText,
@@ -917,9 +1057,9 @@ function renderInstructionTemplate(
   };
 
   let rendered = raw;
-  Object.entries(variables).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(variables)) {
     rendered = rendered.split(`{{${key}}}`).join(value);
-  });
+  }
   return rendered.trim();
 }
 
@@ -940,9 +1080,9 @@ async function testOpenAiToken(
         Result.map(
           (data) => (data as LocalStorageData).openaiApiToken?.trim() ?? ""
         ),
-        Result.andThen((token) =>
-          token
-            ? Result.succeed(token)
+        Result.andThen((storedToken) =>
+          storedToken
+            ? Result.succeed(storedToken)
             : Result.fail(
                 "OpenAI API Tokenが未設定です（ポップアップの「設定」タブで設定してください）"
               )
@@ -1096,20 +1236,30 @@ function storageLocalGet(keys: string[]): Promise<unknown> {
 }
 
 function normalizeOptionalText(value: unknown): string | undefined {
-  if (typeof value !== "string") return;
+  if (typeof value !== "string") {
+    return;
+  }
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
 }
 
 function splitTextRange(value: string): [string, string] | null {
   const normalized = value.trim();
-  if (!normalized) return null;
+  if (!normalized) {
+    return null;
+  }
   const waveMatch = normalized.match(WAVE_SEPARATOR_REGEX);
-  if (waveMatch) return [waveMatch[1].trim(), waveMatch[2].trim()];
+  if (waveMatch) {
+    return [waveMatch[1].trim(), waveMatch[2].trim()];
+  }
   const dashMatch = normalized.match(DASH_SEPARATOR_REGEX);
-  if (dashMatch) return [dashMatch[1].trim(), dashMatch[2].trim()];
+  if (dashMatch) {
+    return [dashMatch[1].trim(), dashMatch[2].trim()];
+  }
   const timeDashMatch = normalized.match(TIME_DASH_REGEX);
-  if (timeDashMatch) return [timeDashMatch[1].trim(), timeDashMatch[2].trim()];
+  if (timeDashMatch) {
+    return [timeDashMatch[1].trim(), timeDashMatch[2].trim()];
+  }
   return null;
 }
 
@@ -1125,10 +1275,14 @@ function normalizeEventRange(
   allDay: true | undefined
 ): NormalizedEventRange {
   // モデルが `start: "2025-12-16 14:00〜15:00"` のようにレンジを一つの文字列に詰めるケースがあるため補正する。
-  if (end || !start) return { start, end, allDay };
+  if (end || !start) {
+    return { start, end, allDay };
+  }
 
   const parts = splitTextRange(start);
-  if (!parts) return { start, end, allDay };
+  if (!parts) {
+    return { start, end, allDay };
+  }
 
   const [left, right] = parts;
 
@@ -1171,7 +1325,9 @@ function formatEventText(event: ExtractedEvent): string {
   const lines: string[] = [];
   lines.push(`タイトル: ${event.title}`);
   lines.push(`日時: ${event.start}${event.end ? ` 〜 ${event.end}` : ""}`);
-  if (event.location) lines.push(`場所: ${event.location}`);
+  if (event.location) {
+    lines.push(`場所: ${event.location}`);
+  }
   if (event.description) {
     lines.push("");
     lines.push("概要:");
@@ -1190,7 +1346,9 @@ function buildGoogleCalendarUrl(event: ExtractedEvent): string | null {
     end: event.end,
     allDay: event.allDay,
   });
-  if (!range) return null;
+  if (!range) {
+    return null;
+  }
   const dates =
     range.kind === "allDay"
       ? `${range.startYyyyMmDd}/${range.endYyyyMmDdExclusive}`
@@ -1201,8 +1359,12 @@ function buildGoogleCalendarUrl(event: ExtractedEvent): string | null {
     text: title,
     dates,
   });
-  if (details) params.set("details", details);
-  if (location) params.set("location", location);
+  if (details) {
+    params.set("details", details);
+  }
+  if (location) {
+    params.set("location", location);
+  }
 
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }

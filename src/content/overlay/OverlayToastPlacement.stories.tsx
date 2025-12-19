@@ -13,7 +13,9 @@ function OverlayToastPlacementStory(): React.JSX.Element {
 
   useLayoutEffect(() => {
     const host = hostRef.current;
-    if (!host) return;
+    if (!host) {
+      return;
+    }
 
     host.id = "my-browser-utils-overlay";
     const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: "open" });
@@ -87,15 +89,20 @@ export const Basic: Story = {
     });
 
     const host = doc.getElementById("my-browser-utils-overlay");
-    if (!(host instanceof HTMLElement))
+    if (!(host instanceof HTMLElement)) {
       throw new Error("Overlay host not found");
+    }
     const shadow = host.shadowRoot;
-    if (!shadow) throw new Error("ShadowRoot not found");
+    if (!shadow) {
+      throw new Error("ShadowRoot not found");
+    }
 
     const trigger = shadow.querySelector<HTMLElement>(
       '[data-testid="toast-trigger"]'
     );
-    if (!trigger) throw new Error("Toast trigger not found");
+    if (!trigger) {
+      throw new Error("Toast trigger not found");
+    }
     await userEvent.click(trigger);
 
     await waitFor(() => {
@@ -103,7 +110,9 @@ export const Basic: Story = {
     });
 
     const toast = shadow.querySelector<HTMLElement>(".mbu-toast-root");
-    if (!toast) throw new Error("Toast not found");
+    if (!toast) {
+      throw new Error("Toast not found");
+    }
 
     const rect = toast.getBoundingClientRect();
     const view = doc.defaultView;

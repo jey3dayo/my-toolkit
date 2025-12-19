@@ -30,21 +30,21 @@ export function CreateLinkPane(props: CreateLinkPaneProps): React.JSX.Element {
 
   const loadFromActiveTab = useCallback(
     async ({ showToast }: { showToast: boolean }): Promise<void> => {
+      const notify = showToast ? props.notify : null;
       setLoading(true);
       try {
         const activeTab = await props.runtime.getActiveTab();
         if (!activeTab) {
-          if (showToast) props.notify.error("有効なタブが見つかりません");
+          notify?.error("有効なタブが見つかりません");
           return;
         }
         setTitle(activeTab.title ?? "");
         setUrl(activeTab.url ?? "");
-        if (showToast) props.notify.success("現在のタブから更新しました");
+        notify?.success("現在のタブから更新しました");
       } catch (error) {
-        if (showToast)
-          props.notify.error(
-            error instanceof Error ? error.message : "取得に失敗しました"
-          );
+        notify?.error(
+          error instanceof Error ? error.message : "取得に失敗しました"
+        );
       } finally {
         setLoading(false);
       }
@@ -53,7 +53,9 @@ export function CreateLinkPane(props: CreateLinkPaneProps): React.JSX.Element {
   );
 
   useEffect(() => {
-    void loadFromActiveTab({ showToast: false });
+    loadFromActiveTab({ showToast: false }).catch(() => {
+      // no-op
+    });
   }, [loadFromActiveTab]);
 
   const copyOutput = async (): Promise<void> => {
@@ -86,7 +88,11 @@ export function CreateLinkPane(props: CreateLinkPaneProps): React.JSX.Element {
             className="btn btn-ghost btn-small"
             data-testid="create-link-refresh"
             disabled={loading}
-            onClick={() => void loadFromActiveTab({ showToast: true })}
+            onClick={() => {
+              loadFromActiveTab({ showToast: true }).catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             更新
@@ -95,7 +101,11 @@ export function CreateLinkPane(props: CreateLinkPaneProps): React.JSX.Element {
             className="btn btn-primary btn-small"
             data-testid="create-link-copy"
             disabled={!canCopy}
-            onClick={() => void copyOutput()}
+            onClick={() => {
+              copyOutput().catch(() => {
+                // no-op
+              });
+            }}
             type="button"
           >
             コピー
@@ -140,11 +150,15 @@ export function CreateLinkPane(props: CreateLinkPaneProps): React.JSX.Element {
           </label>
           <Select.Root
             onValueChange={(value) => {
-              if (typeof value !== "string") return;
+              if (typeof value !== "string") {
+                return;
+              }
               const next = LINK_FORMAT_OPTIONS.find(
                 (option) => option.value === value
               )?.value;
-              if (!next) return;
+              if (!next) {
+                return;
+              }
               setFormat(next);
             }}
             value={format}

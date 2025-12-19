@@ -4,7 +4,9 @@ import { ensureOpenAiTokenConfigured } from "@/popup/token_guard";
 
 describe("ensureOpenAiTokenConfigured", () => {
   it("returns Success when token exists", async () => {
-    const storageLocalGet = vi.fn(async () => ({ openaiApiToken: "sk-test" }));
+    const storageLocalGet = vi.fn(() =>
+      Promise.resolve({ openaiApiToken: "sk-test" })
+    );
     const showNotification = vi.fn();
     const navigateToPane = vi.fn();
     const focusTokenInput = vi.fn();
@@ -23,7 +25,9 @@ describe("ensureOpenAiTokenConfigured", () => {
   });
 
   it("navigates to settings and focuses when token missing", async () => {
-    const storageLocalGet = vi.fn(async () => ({ openaiApiToken: "" }));
+    const storageLocalGet = vi.fn(() =>
+      Promise.resolve({ openaiApiToken: "" })
+    );
     const showNotification = vi.fn();
     const navigateToPane = vi.fn();
     const focusTokenInput = vi.fn();
@@ -48,9 +52,9 @@ describe("ensureOpenAiTokenConfigured", () => {
   });
 
   it("treats storage errors as missing token", async () => {
-    const storageLocalGet = vi.fn(async () => {
-      throw new Error("storage failed");
-    });
+    const storageLocalGet = vi.fn(() =>
+      Promise.reject(new Error("storage failed"))
+    );
     const showNotification = vi.fn();
     const navigateToPane = vi.fn();
     const focusTokenInput = vi.fn();

@@ -12,7 +12,9 @@ import { createNotifications, ToastHost } from "@/ui/toast";
 
 function replaceHash(nextHash: string): void {
   try {
-    if (window.location.hash === nextHash) return;
+    if (window.location.hash === nextHash) {
+      return;
+    }
     window.history.replaceState(null, "", nextHash);
   } catch {
     window.location.hash = nextHash;
@@ -48,7 +50,9 @@ export function PopupApp(): React.JSX.Element {
 
   const syncFromHash = useCallback(() => {
     const next = getPaneIdFromHash(window.location.hash);
-    if (!next) return;
+    if (!next) {
+      return;
+    }
     setTabValue(next);
   }, []);
 

@@ -44,26 +44,40 @@ export type ActionsPaneProps = {
 function isRunContextActionResponse(
   value: unknown
 ): value is RunContextActionResponse {
-  if (typeof value !== "object" || value === null) return false;
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
   const v = value as { ok?: unknown };
-  if (typeof v.ok !== "boolean") return false;
+  if (typeof v.ok !== "boolean") {
+    return false;
+  }
   return true;
 }
 
 function coerceSourceLabel(source: unknown): string {
-  return source === "selection"
-    ? "選択範囲"
-    : source === "page"
-      ? "ページ本文"
-      : "-";
+  if (source === "selection") {
+    return "選択範囲";
+  }
+  if (source === "page") {
+    return "ページ本文";
+  }
+  return "-";
 }
 
 function coerceKind(value: unknown): ContextActionKind | null {
-  return value === "event" ? "event" : value === "text" ? "text" : null;
+  if (value === "event") {
+    return "event";
+  }
+  if (value === "text") {
+    return "text";
+  }
+  return null;
 }
 
 function coerceExtractedEvent(value: unknown): ExtractedEvent | null {
-  if (typeof value !== "object" || value === null) return null;
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
   const raw = value as Partial<ExtractedEvent>;
   const title = typeof raw.title === "string" ? raw.title : "";
   const start = typeof raw.start === "string" ? raw.start : "";
@@ -72,8 +86,77 @@ function coerceExtractedEvent(value: unknown): ExtractedEvent | null {
   const location = typeof raw.location === "string" ? raw.location : undefined;
   const description =
     typeof raw.description === "string" ? raw.description : undefined;
-  if (!start.trim()) return null;
+  if (!start.trim()) {
+    return null;
+  }
   return { title, start, end, allDay, location, description };
+}
+
+function parseRunContextActionResponseToOutput(params: {
+  actionTitle: string;
+  responseUnknown: unknown;
+}): { ok: true; output: OutputState } | { ok: false; error: string } {
+  if (!isRunContextActionResponse(params.responseUnknown)) {
+    return { ok: false, error: "バックグラウンドの応答が不正です" };
+  }
+
+  const response = params.responseUnknown;
+  if (!response.ok) {
+    const errorMessage = (response as { error?: unknown }).error;
+    return {
+      ok: false,
+      error:
+        typeof errorMessage === "string" ? errorMessage : "実行に失敗しました",
+    };
+  }
+
+  const sourceLabel = coerceSourceLabel(
+    (response as { source?: unknown }).source
+  );
+  const resultType = (response as { resultType?: unknown }).resultType;
+  const kind = coerceKind(resultType);
+
+  if (kind === "event") {
+    const eventText = (response as { eventText?: unknown }).eventText;
+    if (typeof eventText !== "string") {
+      return { ok: false, error: "イベント結果が不正です" };
+    }
+    const calendarUrl = (response as { calendarUrl?: unknown }).calendarUrl;
+    const calendarUrlText =
+      typeof calendarUrl === "string" ? calendarUrl.trim() : "";
+    const event = coerceExtractedEvent((response as { event?: unknown }).event);
+    return {
+      ok: true,
+      output: {
+        status: "ready",
+        title: params.actionTitle,
+        text: eventText,
+        sourceLabel,
+        mode: "event",
+        calendarUrl: calendarUrlText || undefined,
+        event: event ?? undefined,
+      },
+    };
+  }
+
+  if (kind !== "text") {
+    return { ok: false, error: "結果の形式が不正です" };
+  }
+
+  const text = (response as { text?: unknown }).text;
+  if (typeof text !== "string") {
+    return { ok: false, error: "テキスト結果が不正です" };
+  }
+  return {
+    ok: true,
+    output: {
+      status: "ready",
+      title: params.actionTitle,
+      text,
+      sourceLabel,
+      mode: "text",
+    },
+  };
 }
 
 export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
@@ -102,42 +185,58 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
     output.status === "ready" &&
     output.mode === "event" &&
     Boolean(output.event);
-  const outputValue =
-    output.status === "ready"
-      ? output.text
-      : output.status === "running"
-        ? "実行中..."
-        : output.status === "error"
-          ? output.message
-          : "";
+  const outputValue = (() => {
+    switch (output.status) {
+      case "ready":
+        return output.text;
+      case "running":
+        return "実行中...";
+      case "error":
+        return output.message;
+      default:
+        return "";
+    }
+  })();
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    const setActionsSafe = (next: ContextAction[]): void => {
+      if (!cancelled) {
+        setActions(next);
+      }
+    };
+
+    (async () => {
       try {
         const data = await props.runtime.storageSyncGet(["contextActions"]);
         const normalized = normalizeContextActions(data.contextActions);
         if (normalized.length > 0) {
-          if (!cancelled) setActions(normalized);
+          setActionsSafe(normalized);
           return;
         }
 
-        if (!cancelled) setActions(DEFAULT_CONTEXT_ACTIONS);
+        setActionsSafe(DEFAULT_CONTEXT_ACTIONS);
         await props.runtime.storageSyncSet({
           contextActions: DEFAULT_CONTEXT_ACTIONS,
         });
       } catch {
-        if (!cancelled) setActions(DEFAULT_CONTEXT_ACTIONS);
+        setActionsSafe(DEFAULT_CONTEXT_ACTIONS);
       }
-    })();
+    })().catch(() => {
+      // no-op
+    });
     return () => {
       cancelled = true;
     };
   }, [props.runtime]);
 
   useEffect(() => {
-    if (!editorId) return;
-    if (actions.some((action) => action.id === editorId)) return;
+    if (!editorId) {
+      return;
+    }
+    if (actions.some((action) => action.id === editorId)) {
+      return;
+    }
     setEditorId("");
     setEditorTitle("");
     setEditorKind("text");
@@ -153,7 +252,9 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
       return;
     }
     const action = actionsById.get(nextId);
-    if (!action) return;
+    if (!action) {
+      return;
+    }
     setEditorTitle(action.title);
     setEditorKind(action.kind);
     setEditorPrompt(action.prompt);
@@ -201,7 +302,9 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
   };
 
   const deleteEditor = async (): Promise<void> => {
-    if (!editorId) return;
+    if (!editorId) {
+      return;
+    }
 
     const previous = actions;
     const nextActions = actions.filter((action) => action.id !== editorId);
@@ -239,14 +342,7 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
     }
   };
 
-  const runAction = async (actionId: string): Promise<void> => {
-    const action = actionsById.get(actionId);
-    if (!action) {
-      props.notify.error("アクションが見つかりません");
-      setOutput({ status: "idle" });
-      return;
-    }
-
+  const ensureTokenReady = async (): Promise<boolean> => {
     const tokenConfigured = await ensureOpenAiTokenConfigured({
       storageLocalGet: (keys) =>
         props.runtime.storageLocalGet(keys as never) as Promise<unknown>,
@@ -263,7 +359,19 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
       focusTokenInput: props.focusTokenInput,
     });
 
-    if (Result.isFailure(tokenConfigured)) {
+    return !Result.isFailure(tokenConfigured);
+  };
+
+  const runAction = async (actionId: string): Promise<void> => {
+    const action = actionsById.get(actionId);
+    if (!action) {
+      props.notify.error("アクションが見つかりません");
+      setOutput({ status: "idle" });
+      return;
+    }
+
+    const tokenReady = await ensureTokenReady();
+    if (!tokenReady) {
       setOutput({ status: "idle" });
       return;
     }
@@ -287,65 +395,17 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
         actionId,
       });
 
-      if (!isRunContextActionResponse(responseUnknown)) {
-        props.notify.error("バックグラウンドの応答が不正です");
-        setOutput({ status: "idle" });
-        return;
-      }
-
-      const response = responseUnknown;
-
-      if (!response.ok) {
-        props.notify.error(response.error);
-        setOutput({ status: "idle" });
-        return;
-      }
-
-      const sourceLabel = coerceSourceLabel(
-        (response as { source?: unknown }).source
-      );
-      const resultType = (response as { resultType?: unknown }).resultType;
-      const kind = coerceKind(resultType);
-
-      if (kind === "event") {
-        const eventText = (response as { eventText?: unknown }).eventText;
-        if (typeof eventText !== "string") {
-          props.notify.error("イベント結果が不正です");
-          setOutput({ status: "idle" });
-          return;
-        }
-        const calendarUrl = (response as { calendarUrl?: unknown }).calendarUrl;
-        const calendarUrlText =
-          typeof calendarUrl === "string" ? calendarUrl.trim() : "";
-        const event = coerceExtractedEvent(
-          (response as { event?: unknown }).event
-        );
-        setOutput({
-          status: "ready",
-          title: action.title,
-          text: eventText,
-          sourceLabel,
-          mode: "event",
-          calendarUrl: calendarUrlText || undefined,
-          event: event ?? undefined,
-        });
-        props.notify.success("完了しました");
-        return;
-      }
-
-      const text = (response as { text?: unknown }).text;
-      if (typeof text !== "string") {
-        props.notify.error("テキスト結果が不正です");
-        setOutput({ status: "idle" });
-        return;
-      }
-      setOutput({
-        status: "ready",
-        title: action.title,
-        text,
-        sourceLabel,
-        mode: "text",
+      const parsed = parseRunContextActionResponseToOutput({
+        actionTitle: action.title,
+        responseUnknown,
       });
+      if (!parsed.ok) {
+        props.notify.error(parsed.error);
+        setOutput({ status: "idle" });
+        return;
+      }
+
+      setOutput(parsed.output);
       props.notify.success("完了しました");
     } catch (error) {
       props.notify.error(
@@ -358,9 +418,13 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
   };
 
   const copyOutput = async (): Promise<void> => {
-    if (output.status !== "ready") return;
+    if (output.status !== "ready") {
+      return;
+    }
     const text = output.text.trim();
-    if (!text) return;
+    if (!text) {
+      return;
+    }
 
     try {
       if (!navigator.clipboard?.writeText) {
@@ -375,7 +439,9 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
   };
 
   const openCalendar = (): void => {
-    if (output.status !== "ready" || output.mode !== "event") return;
+    if (output.status !== "ready" || output.mode !== "event") {
+      return;
+    }
     const calendarUrl = output.calendarUrl?.trim() ?? "";
     if (!calendarUrl) {
       props.notify.error("カレンダーリンクが見つかりません");
@@ -385,7 +451,9 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
   };
 
   const downloadIcs = (): void => {
-    if (output.status !== "ready" || output.mode !== "event") return;
+    if (output.status !== "ready" || output.mode !== "event") {
+      return;
+    }
     const event = output.event;
     if (!event) {
       props.notify.error(".ics の生成に必要な情報が不足しています");
@@ -430,7 +498,9 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
       <ActionButtons
         actions={actions}
         onRun={(actionId) => {
-          void runAction(actionId);
+          runAction(actionId).catch(() => {
+            // no-op
+          });
         }}
       />
 
@@ -439,7 +509,9 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
         canDownloadIcs={canDownloadIcs}
         canOpenCalendar={canOpenCalendar}
         onCopy={() => {
-          void copyOutput();
+          copyOutput().catch(() => {
+            // no-op
+          });
         }}
         onDownloadIcs={() => {
           downloadIcs();
@@ -470,13 +542,19 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
           selectActionForEdit("");
         }}
         onDelete={() => {
-          void deleteEditor();
+          deleteEditor().catch(() => {
+            // no-op
+          });
         }}
         onReset={() => {
-          void resetActions();
+          resetActions().catch(() => {
+            // no-op
+          });
         }}
         onSave={() => {
-          void saveEditor();
+          saveEditor().catch(() => {
+            // no-op
+          });
         }}
         onSelectActionId={(nextId) => {
           selectActionForEdit(nextId);

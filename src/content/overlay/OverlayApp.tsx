@@ -37,12 +37,70 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+// Regex patterns at module level for performance (lint/performance/useTopLevelRegex)
+const SELECTION_SECONDARY_REGEX = /^選択範囲:\s*\n([\s\S]*)$/;
+
+function statusLabelFromStatus(status: OverlayViewModel["status"]): string {
+  if (status === "loading") {
+    return "処理中...";
+  }
+  if (status === "error") {
+    return "エラー";
+  }
+  return "";
+}
+
+function sourceLabelFromSource(source: SummarySource): string {
+  return source === "selection" ? "選択範囲" : "ページ本文";
+}
+
+function deriveSecondaryText(secondary: string): {
+  selectionText: string;
+  secondaryText: string;
+} {
+  const selectionSplit = splitSelectionSecondary(secondary);
+  const selectionText = selectionSplit.selectionText;
+  const secondaryText = selectionText
+    ? selectionSplit.remainder
+    : secondary.trim();
+  return { selectionText, secondaryText };
+}
+
+function canCopyPrimaryFromViewModel(viewModel: OverlayViewModel): boolean {
+  return viewModel.status === "ready" && Boolean(viewModel.primary.trim());
+}
+
+function canOpenCalendarFromViewModel(viewModel: OverlayViewModel): boolean {
+  return (
+    viewModel.mode === "event" &&
+    viewModel.status === "ready" &&
+    Boolean(viewModel.calendarUrl?.trim())
+  );
+}
+
+function canDownloadIcsFromViewModel(viewModel: OverlayViewModel): boolean {
+  return (
+    viewModel.mode === "event" &&
+    viewModel.status === "ready" &&
+    Boolean(viewModel.ics?.trim())
+  );
+}
+
+function readyEventFromViewModel(
+  viewModel: OverlayViewModel
+): ExtractedEvent | null {
+  if (!(viewModel.mode === "event" && viewModel.status === "ready")) {
+    return null;
+  }
+  return viewModel.event ?? null;
+}
+
 function splitSelectionSecondary(secondary: string): {
   selectionText: string;
   remainder: string;
 } {
   const raw = secondary.trim();
-  const match = raw.match(/^選択範囲:\s*\n([\s\S]*)$/);
+  const match = raw.match(SELECTION_SECONDARY_REGEX);
   if (!match) {
     return { selectionText: "", remainder: raw };
   }
@@ -63,202 +121,470 @@ function splitSelectionSecondary(secondary: string): {
   return { selectionText, remainder };
 }
 
+type OverlayNotify = ReturnType<typeof createNotifications>["notify"];
+type StateSetter<T> = React.Dispatch<React.SetStateAction<T>>;
+
+type DragOffset = { x: number; y: number };
+type PanelSize = { width: number; height: number };
+
+function getPanelSize(panel: HTMLDivElement | null): PanelSize {
+  const rect = panel?.getBoundingClientRect();
+  return { width: rect?.width || 520, height: rect?.height || 300 };
+}
+
+function updateHostPosition(
+  host: HTMLDivElement,
+  size: PanelSize,
+  point: Point
+): void {
+  const margin = 16;
+  const maxLeft = Math.max(margin, window.innerWidth - size.width - margin);
+  const maxTop = Math.max(margin, window.innerHeight - size.height - margin);
+  const left = clamp(point.left, margin, maxLeft);
+  const top = clamp(point.top, margin, maxTop);
+  host.style.left = `${Math.round(left)}px`;
+  host.style.top = `${Math.round(top)}px`;
+}
+
+function positionOverlayHost(params: {
+  open: boolean;
+  host: HTMLDivElement;
+  panel: HTMLDivElement | null;
+  pinned: boolean;
+  pinnedPos: Point | null;
+  anchorRect: OverlayViewModel["anchorRect"];
+}): void {
+  if (!params.open) {
+    return;
+  }
+
+  const size = getPanelSize(params.panel);
+
+  if (params.pinned && params.pinnedPos) {
+    updateHostPosition(params.host, size, params.pinnedPos);
+    return;
+  }
+
+  const anchor = params.anchorRect;
+  if (!anchor) {
+    updateHostPosition(params.host, size, {
+      left: window.innerWidth - size.width - 16,
+      top: 16,
+    });
+    return;
+  }
+
+  updateHostPosition(params.host, size, {
+    left: anchor.left,
+    top: anchor.top + anchor.height + 10,
+  });
+}
+
+async function copyTextToClipboard(
+  notify: OverlayNotify,
+  text: string
+): Promise<void> {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return;
+  }
+  if (!navigator.clipboard?.writeText) {
+    notify.error("コピーに失敗しました");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(trimmed);
+    notify.success("コピーしました");
+  } catch {
+    notify.error("コピーに失敗しました");
+  }
+}
+
+function openUrlInNewTab(url: string): void {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return;
+  }
+  window.open(trimmed, "_blank", "noopener,noreferrer");
+}
+
+function downloadIcsFile(notify: OverlayNotify, ics: string): void {
+  const trimmed = ics.trim();
+  if (!trimmed) {
+    return;
+  }
+  try {
+    const blob = new Blob([trimmed], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "event.ics";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    notify.success("ダウンロードしました");
+  } catch {
+    notify.error("ダウンロードに失敗しました");
+  }
+}
+
+function startOverlayDrag(params: {
+  event: React.PointerEvent<HTMLButtonElement>;
+  host: HTMLDivElement;
+  dragOffsetRef: React.MutableRefObject<DragOffset | null>;
+  setPinned: StateSetter<boolean>;
+  setDragging: StateSetter<boolean>;
+  setPinnedPos: StateSetter<Point | null>;
+}): void {
+  if (params.event.button !== 0) {
+    return;
+  }
+  params.event.preventDefault();
+  const rect = params.host.getBoundingClientRect();
+  params.dragOffsetRef.current = {
+    x: params.event.clientX - rect.left,
+    y: params.event.clientY - rect.top,
+  };
+  params.setPinned(true);
+  params.setDragging(true);
+  params.setPinnedPos({ left: rect.left, top: rect.top });
+  try {
+    params.event.currentTarget.setPointerCapture(params.event.pointerId);
+  } catch {
+    // no-op
+  }
+}
+
+function moveOverlayDrag(params: {
+  event: React.PointerEvent<HTMLButtonElement>;
+  host: HTMLDivElement;
+  panel: HTMLDivElement | null;
+  dragging: boolean;
+  dragOffsetRef: React.MutableRefObject<DragOffset | null>;
+  setPinnedPos: StateSetter<Point | null>;
+}): void {
+  if (!params.dragging) {
+    return;
+  }
+  const offset = params.dragOffsetRef.current;
+  if (!offset) {
+    return;
+  }
+
+  const size = getPanelSize(params.panel);
+  const margin = 16;
+  const maxLeft = Math.max(margin, window.innerWidth - size.width - margin);
+  const maxTop = Math.max(margin, window.innerHeight - size.height - margin);
+  params.setPinnedPos({
+    left: clamp(params.event.clientX - offset.x, margin, maxLeft),
+    top: clamp(params.event.clientY - offset.y, margin, maxTop),
+  });
+}
+
+function endOverlayDrag(params: {
+  event: React.PointerEvent<HTMLButtonElement>;
+  dragging: boolean;
+  dragOffsetRef: React.MutableRefObject<DragOffset | null>;
+  setDragging: StateSetter<boolean>;
+}): void {
+  if (!params.dragging) {
+    return;
+  }
+  params.setDragging(false);
+  params.dragOffsetRef.current = null;
+  try {
+    params.event.currentTarget.releasePointerCapture(params.event.pointerId);
+  } catch {
+    // no-op
+  }
+}
+
+function toggleOverlayPinned(params: {
+  pinned: boolean;
+  host: HTMLDivElement;
+  setPinned: StateSetter<boolean>;
+  setPinnedPos: StateSetter<Point | null>;
+}): void {
+  if (!params.pinned) {
+    const rect = params.host.getBoundingClientRect();
+    params.setPinned(true);
+    params.setPinnedPos({ left: rect.left, top: rect.top });
+    return;
+  }
+  params.setPinned(false);
+  params.setPinnedPos(null);
+}
+
+type OverlayCopyButtonProps = {
+  disabled: boolean;
+  onCopy: () => void;
+};
+
+function OverlayCopyButton(props: OverlayCopyButtonProps): React.JSX.Element {
+  return (
+    <Button
+      aria-label="コピー"
+      className="mbu-overlay-action mbu-overlay-icon-button mbu-overlay-copy"
+      data-testid="overlay-copy"
+      disabled={props.disabled}
+      onClick={props.onCopy}
+      title="コピー"
+      type="button"
+    >
+      <CopyIcon />
+    </Button>
+  );
+}
+
+type OverlayEventModeActionsProps = {
+  canOpenCalendar: boolean;
+  canDownloadIcs: boolean;
+  canCopyPrimary: boolean;
+  onOpenCalendar: () => void;
+  onDownloadIcs: () => void;
+  onCopyPrimary: () => void;
+};
+
+function OverlayEventModeActions(
+  props: OverlayEventModeActionsProps
+): React.JSX.Element {
+  return (
+    <div className="mbu-overlay-body-actions">
+      <Button
+        className="mbu-overlay-action"
+        disabled={!props.canOpenCalendar}
+        onClick={props.onOpenCalendar}
+        type="button"
+      >
+        Googleカレンダーに登録
+      </Button>
+      <Button
+        className="mbu-overlay-action"
+        disabled={!props.canDownloadIcs}
+        onClick={props.onDownloadIcs}
+        type="button"
+      >
+        .ics
+      </Button>
+      {props.canCopyPrimary ? (
+        <OverlayCopyButton
+          disabled={!props.canCopyPrimary}
+          onCopy={props.onCopyPrimary}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+type OverlayEventDetailsProps = {
+  event: ExtractedEvent;
+  selectionText: string;
+};
+
+function OverlayEventDetails(
+  props: OverlayEventDetailsProps
+): React.JSX.Element {
+  return (
+    <>
+      <table className="mbu-overlay-event-table">
+        <tbody>
+          <tr>
+            <th scope="row">タイトル</th>
+            <td>{props.event.title}</td>
+          </tr>
+          <tr>
+            <th scope="row">日時</th>
+            <td>
+              {props.event.end
+                ? `${props.event.start} ～ ${props.event.end}`
+                : props.event.start}
+            </td>
+          </tr>
+          {props.event.location ? (
+            <tr>
+              <th scope="row">場所</th>
+              <td>{props.event.location}</td>
+            </tr>
+          ) : null}
+          {props.event.description ? (
+            <tr>
+              <th scope="row">概要</th>
+              <td>{props.event.description}</td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+      <AuxTextDisclosure
+        summary="選択したテキスト（確認用）"
+        text={props.selectionText}
+      />
+    </>
+  );
+}
+
+type OverlayTextDetailsProps = {
+  mode: OverlayViewModel["mode"];
+  statusLabel: string;
+  canCopyPrimary: boolean;
+  primary: string;
+  secondaryText: string;
+  selectionText: string;
+  onCopyPrimary: () => void;
+};
+
+function OverlayTextDetails(props: OverlayTextDetailsProps): React.JSX.Element {
+  return (
+    <>
+      {props.statusLabel ? (
+        <div className="mbu-overlay-status">{props.statusLabel}</div>
+      ) : null}
+      <div className="mbu-overlay-primary-block">
+        {props.mode === "event" || !props.canCopyPrimary ? null : (
+          <OverlayCopyButton
+            disabled={!props.canCopyPrimary}
+            onCopy={props.onCopyPrimary}
+          />
+        )}
+        <pre className="mbu-overlay-primary-text">{props.primary}</pre>
+      </div>
+      {props.secondaryText ? (
+        <pre className="mbu-overlay-secondary-text">{props.secondaryText}</pre>
+      ) : null}
+      <AuxTextDisclosure
+        summary="選択したテキスト（確認用）"
+        text={props.selectionText}
+      />
+    </>
+  );
+}
+
+type OverlayBodyProps = {
+  mode: OverlayViewModel["mode"];
+  primary: string;
+  readyEvent: ExtractedEvent | null;
+  canOpenCalendar: boolean;
+  canDownloadIcs: boolean;
+  canCopyPrimary: boolean;
+  statusLabel: string;
+  selectionText: string;
+  secondaryText: string;
+  onCopyPrimary: () => void;
+  onOpenCalendar: () => void;
+  onDownloadIcs: () => void;
+};
+
+function OverlayBody(props: OverlayBodyProps): React.JSX.Element {
+  return (
+    <div className="mbu-overlay-body">
+      {props.mode === "event" ? (
+        <OverlayEventModeActions
+          canCopyPrimary={props.canCopyPrimary}
+          canDownloadIcs={props.canDownloadIcs}
+          canOpenCalendar={props.canOpenCalendar}
+          onCopyPrimary={props.onCopyPrimary}
+          onDownloadIcs={props.onDownloadIcs}
+          onOpenCalendar={props.onOpenCalendar}
+        />
+      ) : null}
+
+      {props.readyEvent ? (
+        <OverlayEventDetails
+          event={props.readyEvent}
+          selectionText={props.selectionText}
+        />
+      ) : (
+        <OverlayTextDetails
+          canCopyPrimary={props.canCopyPrimary}
+          mode={props.mode}
+          onCopyPrimary={props.onCopyPrimary}
+          primary={props.primary}
+          secondaryText={props.secondaryText}
+          selectionText={props.selectionText}
+          statusLabel={props.statusLabel}
+        />
+      )}
+    </div>
+  );
+}
+
 export function OverlayApp(props: Props): React.JSX.Element | null {
   const { toastManager, notify } = useMemo(() => createNotifications(), []);
+  const viewModel = props.viewModel;
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [pinned, setPinned] = useState(false);
   const [pinnedPos, setPinnedPos] = useState<Point | null>(null);
   const [dragging, setDragging] = useState(false);
-  const dragOffsetRef = useRef<{ x: number; y: number } | null>(null);
+  const dragOffsetRef = useRef<DragOffset | null>(null);
 
   useLayoutEffect(() => {
-    if (!props.viewModel.open) {
-      return;
-    }
-    const panel = panelRef.current;
-    const panelRect = panel?.getBoundingClientRect();
-    const width = panelRect?.width || 520;
-    const height = panelRect?.height || 300;
+    positionOverlayHost({
+      open: viewModel.open,
+      host: props.host,
+      panel: panelRef.current,
+      pinned,
+      pinnedPos,
+      anchorRect: viewModel.anchorRect,
+    });
+  }, [props.host, viewModel.open, viewModel.anchorRect, pinned, pinnedPos]);
 
-    const updateHostPosition = (point: Point): void => {
-      const margin = 16;
-      const maxLeft = Math.max(margin, window.innerWidth - width - margin);
-      const maxTop = Math.max(margin, window.innerHeight - height - margin);
-      const left = clamp(point.left, margin, maxLeft);
-      const top = clamp(point.top, margin, maxTop);
-      props.host.style.left = `${Math.round(left)}px`;
-      props.host.style.top = `${Math.round(top)}px`;
-    };
-
-    if (pinned && pinnedPos) {
-      updateHostPosition(pinnedPos);
-      return;
-    }
-
-    const anchor = props.viewModel.anchorRect;
-    if (!anchor) {
-      updateHostPosition({ left: window.innerWidth - width - 16, top: 16 });
-      return;
-    }
-
-    const preferred = {
-      left: anchor.left,
-      top: anchor.top + anchor.height + 10,
-    };
-    updateHostPosition(preferred);
-  }, [
-    props.host,
-    props.viewModel.open,
-    props.viewModel.anchorRect,
-    pinned,
-    pinnedPos,
-  ]);
-
-  if (!props.viewModel.open) {
+  if (!viewModel.open) {
     return null;
   }
 
-  const copyPrimary = async (): Promise<void> => {
-    const text = props.viewModel.primary.trim();
-    if (!text) {
-      return;
-    }
-    if (!navigator.clipboard?.writeText) {
-      notify.error("コピーに失敗しました");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      notify.success("コピーしました");
-    } catch {
-      notify.error("コピーに失敗しました");
-    }
+  const onCopyPrimary = (): void => {
+    copyTextToClipboard(notify, viewModel.primary).catch(() => {
+      // no-op
+    });
   };
 
   const openCalendar = (): void => {
-    const url = props.viewModel.calendarUrl?.trim() ?? "";
-    if (!url) {
-      return;
-    }
-    window.open(url, "_blank", "noopener,noreferrer");
+    openUrlInNewTab(viewModel.calendarUrl ?? "");
   };
 
   const downloadIcs = (): void => {
-    const ics = props.viewModel.ics?.trim() ?? "";
-    if (!ics) {
-      return;
-    }
-    try {
-      const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "event.ics";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      notify.success("ダウンロードしました");
-    } catch {
-      notify.error("ダウンロードに失敗しました");
-    }
+    downloadIcsFile(notify, viewModel.ics ?? "");
   };
 
   const startDrag = (event: React.PointerEvent<HTMLButtonElement>): void => {
-    if (event.button !== 0) {
-      return;
-    }
-    event.preventDefault();
-    const rect = props.host.getBoundingClientRect();
-    dragOffsetRef.current = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
-    setPinned(true);
-    setDragging(true);
-    setPinnedPos({ left: rect.left, top: rect.top });
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // no-op
-    }
+    startOverlayDrag({
+      event,
+      host: props.host,
+      dragOffsetRef,
+      setPinned,
+      setDragging,
+      setPinnedPos,
+    });
   };
 
   const moveDrag = (event: React.PointerEvent<HTMLButtonElement>): void => {
-    if (!dragging) {
-      return;
-    }
-    const offset = dragOffsetRef.current;
-    if (!offset) {
-      return;
-    }
-    const panel = panelRef.current;
-    const panelRect = panel?.getBoundingClientRect();
-    const width = panelRect?.width || 520;
-    const height = panelRect?.height || 300;
-    const next = {
-      left: event.clientX - offset.x,
-      top: event.clientY - offset.y,
-    };
-    setPinnedPos({
-      left: clamp(next.left, 16, Math.max(16, window.innerWidth - width - 16)),
-      top: clamp(next.top, 16, Math.max(16, window.innerHeight - height - 16)),
+    moveOverlayDrag({
+      event,
+      host: props.host,
+      panel: panelRef.current,
+      dragging,
+      dragOffsetRef,
+      setPinnedPos,
     });
   };
 
   const endDrag = (event: React.PointerEvent<HTMLButtonElement>): void => {
-    if (!dragging) {
-      return;
-    }
-    setDragging(false);
-    dragOffsetRef.current = null;
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // no-op
-    }
+    endOverlayDrag({ event, dragging, dragOffsetRef, setDragging });
   };
 
   const togglePinned = (): void => {
-    if (!pinned) {
-      const rect = props.host.getBoundingClientRect();
-      setPinned(true);
-      setPinnedPos({ left: rect.left, top: rect.top });
-      return;
-    }
-    setPinned(false);
-    setPinnedPos(null);
+    toggleOverlayPinned({ pinned, host: props.host, setPinned, setPinnedPos });
   };
 
-  const sourceLabel =
-    props.viewModel.source === "selection" ? "選択範囲" : "ページ本文";
-  const statusLabel =
-    props.viewModel.status === "loading"
-      ? "処理中..."
-      : props.viewModel.status === "error"
-        ? "エラー"
-        : "";
-
-  const isReadyEvent =
-    props.viewModel.mode === "event" &&
-    props.viewModel.status === "ready" &&
-    props.viewModel.event;
-  const selectionSplit = splitSelectionSecondary(props.viewModel.secondary);
-  const selectionText = selectionSplit.selectionText;
-  const secondaryText = selectionText
-    ? selectionSplit.remainder
-    : props.viewModel.secondary.trim();
-  const canCopyPrimary =
-    props.viewModel.status === "ready" &&
-    Boolean(props.viewModel.primary.trim());
-  const canOpenCalendar =
-    props.viewModel.mode === "event" &&
-    props.viewModel.status === "ready" &&
-    Boolean(props.viewModel.calendarUrl?.trim());
-  const canDownloadIcs =
-    props.viewModel.mode === "event" &&
-    props.viewModel.status === "ready" &&
-    Boolean(props.viewModel.ics?.trim());
+  const sourceLabel = sourceLabelFromSource(viewModel.source);
+  const statusLabel = statusLabelFromStatus(viewModel.status);
+  const { selectionText, secondaryText } = deriveSecondaryText(
+    viewModel.secondary
+  );
+  const readyEvent = readyEventFromViewModel(viewModel);
+  const canCopyPrimary = canCopyPrimaryFromViewModel(viewModel);
+  const canOpenCalendar = canOpenCalendarFromViewModel(viewModel);
+  const canDownloadIcs = canDownloadIcsFromViewModel(viewModel);
 
   return (
     <div className="mbu-overlay-surface">
@@ -282,7 +608,7 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
               ⋮⋮
             </Button>
             <div className="mbu-overlay-title">
-              {props.viewModel.title}{" "}
+              {viewModel.title}{" "}
               <span className="mbu-overlay-chip">{sourceLabel}</span>
             </div>
           </div>
@@ -311,110 +637,20 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
           </div>
         </div>
 
-        <div className="mbu-overlay-body">
-          {props.viewModel.mode === "event" ? (
-            <div className="mbu-overlay-body-actions">
-              <Button
-                className="mbu-overlay-action"
-                disabled={!canOpenCalendar}
-                onClick={openCalendar}
-                type="button"
-              >
-                Googleカレンダーに登録
-              </Button>
-              <Button
-                className="mbu-overlay-action"
-                disabled={!canDownloadIcs}
-                onClick={downloadIcs}
-                type="button"
-              >
-                .ics
-              </Button>
-              {canCopyPrimary ? (
-                <Button
-                  aria-label="コピー"
-                  className="mbu-overlay-action mbu-overlay-icon-button mbu-overlay-copy"
-                  data-testid="overlay-copy"
-                  disabled={!canCopyPrimary}
-                  onClick={() => void copyPrimary()}
-                  title="コピー"
-                  type="button"
-                >
-                  <CopyIcon />
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-          {isReadyEvent ? (
-            <>
-              <table className="mbu-overlay-event-table">
-                <tbody>
-                  <tr>
-                    <th scope="row">タイトル</th>
-                    <td>{props.viewModel.event?.title}</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">日時</th>
-                    <td>
-                      {props.viewModel.event?.end
-                        ? `${props.viewModel.event?.start} ～ ${props.viewModel.event?.end}`
-                        : props.viewModel.event?.start}
-                    </td>
-                  </tr>
-                  {props.viewModel.event?.location ? (
-                    <tr>
-                      <th scope="row">場所</th>
-                      <td>{props.viewModel.event.location}</td>
-                    </tr>
-                  ) : null}
-                  {props.viewModel.event?.description ? (
-                    <tr>
-                      <th scope="row">概要</th>
-                      <td>{props.viewModel.event.description}</td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-              <AuxTextDisclosure
-                summary="選択したテキスト（確認用）"
-                text={selectionText}
-              />
-            </>
-          ) : (
-            <>
-              {statusLabel ? (
-                <div className="mbu-overlay-status">{statusLabel}</div>
-              ) : null}
-              <div className="mbu-overlay-primary-block">
-                {props.viewModel.mode === "event" || !canCopyPrimary ? null : (
-                  <Button
-                    aria-label="コピー"
-                    className="mbu-overlay-action mbu-overlay-icon-button mbu-overlay-copy"
-                    data-testid="overlay-copy"
-                    disabled={!canCopyPrimary}
-                    onClick={() => void copyPrimary()}
-                    title="コピー"
-                    type="button"
-                  >
-                    <CopyIcon />
-                  </Button>
-                )}
-                <pre className="mbu-overlay-primary-text">
-                  {props.viewModel.primary}
-                </pre>
-              </div>
-              {secondaryText ? (
-                <pre className="mbu-overlay-secondary-text">
-                  {secondaryText}
-                </pre>
-              ) : null}
-              <AuxTextDisclosure
-                summary="選択したテキスト（確認用）"
-                text={selectionText}
-              />
-            </>
-          )}
-        </div>
+        <OverlayBody
+          canCopyPrimary={canCopyPrimary}
+          canDownloadIcs={canDownloadIcs}
+          canOpenCalendar={canOpenCalendar}
+          mode={viewModel.mode}
+          onCopyPrimary={onCopyPrimary}
+          onDownloadIcs={downloadIcs}
+          onOpenCalendar={openCalendar}
+          primary={viewModel.primary}
+          readyEvent={readyEvent}
+          secondaryText={secondaryText}
+          selectionText={selectionText}
+          statusLabel={statusLabel}
+        />
       </div>
     </div>
   );

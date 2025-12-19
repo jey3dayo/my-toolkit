@@ -19,7 +19,9 @@ async function initTheme(): Promise<void> {
   const start = (): void => {
     ensurePopupUiBaseStyles(document);
     applyTheme("auto", document);
-    void initTheme();
+    initTheme().catch(() => {
+      // no-op
+    });
 
     const isExtensionPage = window.location.protocol === "chrome-extension:";
     if (isExtensionPage) {

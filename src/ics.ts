@@ -22,7 +22,9 @@ export function buildIcs(event: ExtractedEvent): string | null {
 
   const foldLine = (line: string): string => {
     const max = 75;
-    if (line.length <= max) return line;
+    if (line.length <= max) {
+      return line;
+    }
     let out = "";
     for (let i = 0; i < line.length; i += max) {
       out += (i === 0 ? "" : "\r\n ") + line.slice(i, i + max);
@@ -35,7 +37,9 @@ export function buildIcs(event: ExtractedEvent): string | null {
     end: event.end,
     allDay: event.allDay,
   });
-  if (!range) return null;
+  if (!range) {
+    return null;
+  }
 
   const dtStartLine =
     range.kind === "allDay"
@@ -51,7 +55,9 @@ export function buildIcs(event: ExtractedEvent): string | null {
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const dtStamp = formatUtcDateTimeFromDate(new Date());
-  if (!dtStamp) return null;
+  if (!dtStamp) {
+    return null;
+  }
 
   const lines = [
     "BEGIN:VCALENDAR",
@@ -70,5 +76,5 @@ export function buildIcs(event: ExtractedEvent): string | null {
     "END:VCALENDAR",
   ].filter(Boolean);
 
-  return lines.map(foldLine).join("\r\n") + "\r\n";
+  return `${lines.map(foldLine).join("\r\n")}\r\n`;
 }

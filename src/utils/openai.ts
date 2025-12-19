@@ -2,12 +2,18 @@ import { Result } from "@praha/byethrow";
 import { toErrorMessage } from "@/utils/errors";
 
 export function extractChatCompletionText(json: unknown): string | null {
-  if (typeof json !== "object" || json === null) return null;
+  if (typeof json !== "object" || json === null) {
+    return null;
+  }
   const choices = (json as { choices?: unknown }).choices;
-  if (!Array.isArray(choices) || choices.length === 0) return null;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return null;
+  }
   const first = choices[0] as { message?: { content?: unknown } };
   const content = first?.message?.content;
-  if (typeof content !== "string") return null;
+  if (typeof content !== "string") {
+    return null;
+  }
   return content.trim();
 }
 

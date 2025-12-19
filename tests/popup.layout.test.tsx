@@ -13,7 +13,7 @@ import { createPopupDom } from "./helpers/popupDom";
 describe("popup layout structure", () => {
   let dom: JSDOM;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.resetModules();
     dom = createPopupDom("file:///popup.html#pane-actions");
     vi.stubGlobal("window", dom.window);
@@ -27,7 +27,9 @@ describe("popup layout structure", () => {
 
   it("renders the hero logo column before the title text (prevents narrow title wrapping)", async () => {
     const rootEl = dom.window.document.getElementById("root");
-    if (!rootEl) throw new Error("missing #root");
+    if (!rootEl) {
+      throw new Error("missing #root");
+    }
 
     const root = createRoot(rootEl);
     await act(async () => {
@@ -42,14 +44,16 @@ describe("popup layout structure", () => {
     expect(children[0]?.classList.contains("hero-logo-wrap")).toBe(true);
     expect(children[1]?.classList.contains("title-text")).toBe(true);
 
-    await act(async () => {
+    act(() => {
       root.unmount();
     });
   });
 
   it("styles sidebar tabs using the nav-item structure (icon + label)", async () => {
     const rootEl = dom.window.document.getElementById("root");
-    if (!rootEl) throw new Error("missing #root");
+    if (!rootEl) {
+      throw new Error("missing #root");
+    }
 
     const root = createRoot(rootEl);
     await act(async () => {
@@ -64,13 +68,13 @@ describe("popup layout structure", () => {
     );
     expect(tabButtons.length).toBe(4);
 
-    tabButtons.forEach((tab) => {
+    for (const tab of tabButtons) {
       expect(tab.classList.contains("nav-item")).toBe(true);
       expect(tab.querySelector(".nav-icon")).not.toBeNull();
       expect(tab.querySelector(".nav-label")).not.toBeNull();
-    });
+    }
 
-    await act(async () => {
+    act(() => {
       root.unmount();
     });
   });

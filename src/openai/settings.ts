@@ -14,7 +14,9 @@ export type OpenAiSettings = {
 };
 
 export function normalizeOpenAiModel(value: unknown): string {
-  if (typeof value !== "string") return DEFAULT_OPENAI_MODEL;
+  if (typeof value !== "string") {
+    return DEFAULT_OPENAI_MODEL;
+  }
   const model = value.trim();
   return model || DEFAULT_OPENAI_MODEL;
 }

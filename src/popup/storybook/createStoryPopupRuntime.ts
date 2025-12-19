@@ -34,42 +34,52 @@ function createInMemoryStorageArea<T extends Record<string, unknown>>(
   const data = new Map<string, unknown>(Object.entries(initial ?? {}));
 
   return {
-    get: async (keys) => {
+    get: (keys) => {
       const result: Partial<T> = {};
       for (const key of keys) {
         const stored = data.get(String(key));
-        if (typeof stored === "undefined") continue;
+        if (typeof stored === "undefined") {
+          continue;
+        }
         (result as Record<string, unknown>)[String(key)] = stored;
       }
-      return result;
+      return Promise.resolve(result);
     },
-    set: async (items) => {
+    set: (items) => {
       for (const [key, value] of Object.entries(items)) {
-        if (typeof value === "undefined") continue;
+        if (typeof value === "undefined") {
+          continue;
+        }
         data.set(key, value);
       }
+      return Promise.resolve();
     },
-    remove: async (keys) => {
+    remove: (keys) => {
       const list = Array.isArray(keys) ? keys : [keys];
       for (const key of list) {
         data.delete(String(key));
       }
+      return Promise.resolve();
     },
   };
 }
 
 function getMessageAction(message: unknown): unknown {
-  if (typeof message !== "object" || message === null) return null;
+  if (typeof message !== "object" || message === null) {
+    return null;
+  }
   return (message as { action?: unknown }).action ?? null;
 }
 
 export function createStoryPopupRuntime(options: Options = {}): PopupRuntime {
-  const activeTab: ActiveTabInfo | null =
-    typeof options.activeTab !== "undefined"
-      ? options.activeTab
-      : options.activeTabId === null
-        ? null
-        : { id: options.activeTabId ?? 123 };
+  let activeTab: ActiveTabInfo | null;
+  if (typeof options.activeTab !== "undefined") {
+    activeTab = options.activeTab;
+  } else if (options.activeTabId === null) {
+    activeTab = null;
+  } else {
+    activeTab = { id: options.activeTabId ?? 123 };
+  }
   const sync = createInMemoryStorageArea<SyncStorageData>(options.sync);
   const local = createInMemoryStorageArea<LocalStorageData>(options.local);
 
@@ -112,7 +122,9 @@ export function createStoryPopupRuntime(options: Options = {}): PopupRuntime {
     openUrl: (url) => {
       try {
         const trimmed = url.trim();
-        if (!trimmed) return;
+        if (!trimmed) {
+          return;
+        }
         window.open(trimmed, "_blank", "noopener,noreferrer");
       } catch {
         // no-op

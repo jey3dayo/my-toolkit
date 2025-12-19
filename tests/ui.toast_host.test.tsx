@@ -41,7 +41,7 @@ describe("ToastHost", () => {
       document.body.querySelector(".mbu-toast-root")?.textContent
     ).toContain("完了しました");
 
-    await act(async () => {
+    act(() => {
       root.unmount();
     });
     container.remove();
@@ -74,7 +74,7 @@ describe("ToastHost", () => {
     );
     expect(document.body.querySelector(".mbu-toast-root")).toBeNull();
 
-    await act(async () => {
+    act(() => {
       root.unmount();
     });
     host.remove();
