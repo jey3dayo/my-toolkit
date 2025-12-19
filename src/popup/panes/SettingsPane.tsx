@@ -14,6 +14,7 @@ import {
   DEFAULT_OPENAI_MODEL,
   normalizeOpenAiModel,
   OPENAI_MODEL_OPTIONS,
+  type OpenAiModelOption,
 } from "@/openai/settings";
 import type { PopupPaneBaseProps } from "@/popup/panes/types";
 import type {
@@ -44,13 +45,23 @@ function isTestOpenAiTokenResponse(
   return typeof (value as { error?: unknown }).error === "string";
 }
 
+function isPresetModelOption(value: string): value is OpenAiModelOption {
+  return OPENAI_MODEL_OPTIONS.includes(value as OpenAiModelOption);
+}
+
+function resolvePresetModel(value: string): OpenAiModelOption {
+  return isPresetModelOption(value) ? value : DEFAULT_OPENAI_MODEL;
+}
+
 export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [customPrompt, setCustomPrompt] = useState("");
   const [model, setModel] = useState(DEFAULT_OPENAI_MODEL);
+  const [presetModel, setPresetModel] = useState(DEFAULT_OPENAI_MODEL);
   const [theme, setTheme] = useState<Theme>("auto");
   const tokenInputId = useId();
+  const modelInputId = useId();
 
   useEffect(() => {
     let cancelled = false;
@@ -61,18 +72,18 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
         "openaiModel",
         "theme",
       ]);
-      if (Result.isFailure(loaded)) {
+      if (Result.isFailure(loaded) || cancelled) {
         return;
       }
       const raw: Partial<LocalStorageData> = loaded.value;
-      if (cancelled) {
-        return;
-      }
       setToken(raw.openaiApiToken ?? "");
       setCustomPrompt(raw.openaiCustomPrompt ?? "");
-      setModel(normalizeOpenAiModel(raw.openaiModel));
-      setTheme(isTheme(raw.theme) ? raw.theme : "auto");
-      applyTheme(isTheme(raw.theme) ? raw.theme : "auto", document);
+      const normalizedModel = normalizeOpenAiModel(raw.openaiModel);
+      setModel(normalizedModel);
+      setPresetModel(resolvePresetModel(normalizedModel));
+      const resolvedTheme: Theme = isTheme(raw.theme) ? raw.theme : "auto";
+      setTheme(resolvedTheme);
+      applyTheme(resolvedTheme, document);
     })().catch(() => {
       // no-op
     });
@@ -159,6 +170,7 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
     });
     if (Result.isSuccess(saved)) {
       setModel(normalized);
+      setPresetModel(resolvePresetModel(normalized));
       props.notify.success("保存しました");
       return;
     }
@@ -169,6 +181,7 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
     const removed = await props.runtime.storageLocalRemove("openaiModel");
     if (Result.isSuccess(removed)) {
       setModel(DEFAULT_OPENAI_MODEL);
+      setPresetModel(DEFAULT_OPENAI_MODEL);
       props.notify.success("デフォルトに戻しました");
       return;
     }
@@ -285,13 +298,36 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
           <Fieldset.Legend className="mbu-fieldset-legend">
             モデル
           </Fieldset.Legend>
+
+          <label className="field" htmlFor={modelInputId}>
+            <span className="field-name">モデルID</span>
+            <Input
+              className="token-input"
+              data-testid="openai-model-id"
+              id={modelInputId}
+              onValueChange={(value) => {
+                setModel(value);
+                if (isPresetModelOption(value)) {
+                  setPresetModel(value);
+                }
+              }}
+              value={model}
+            />
+          </label>
+
+          <p className="hint">
+            値はそのままOpenAI
+            APIへ渡されます。プリセットから選ぶ場合は下の一覧を使ってください。
+          </p>
+
           <Select.Root
             onValueChange={(value) => {
               if (typeof value === "string") {
+                setPresetModel(value);
                 setModel(value);
               }
             }}
-            value={model}
+            value={presetModel}
           >
             <Select.Trigger
               aria-label="モデル"

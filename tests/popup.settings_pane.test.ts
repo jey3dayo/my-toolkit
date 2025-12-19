@@ -178,10 +178,14 @@ describe("popup Settings pane", () => {
     const modelSelect = dom.window.document.querySelector<HTMLButtonElement>(
       '[data-testid="openai-model"]'
     );
+    const modelInput = dom.window.document.querySelector<HTMLInputElement>(
+      '[data-testid="openai-model-id"]'
+    );
     const save = dom.window.document.querySelector<HTMLButtonElement>(
       '[data-testid="model-save"]'
     );
     expect(modelSelect).not.toBeNull();
+    expect(modelInput).not.toBeNull();
     expect(save).not.toBeNull();
 
     expect(modelSelect?.textContent).toContain("gpt-4o");
@@ -198,6 +202,29 @@ describe("popup Settings pane", () => {
 
     expect(chromeStub.storage.local.set).toHaveBeenCalledWith(
       expect.objectContaining({ openaiModel: "gpt-4o-mini" }),
+      expect.any(Function)
+    );
+    expect(modelInput?.value).toBe("gpt-4o-mini");
+  });
+
+  it("saves a custom model id via local storage", async () => {
+    const modelInput = dom.window.document.querySelector<HTMLInputElement>(
+      '[data-testid="openai-model-id"]'
+    );
+    const save = dom.window.document.querySelector<HTMLButtonElement>(
+      '[data-testid="model-save"]'
+    );
+    expect(modelInput).not.toBeNull();
+    expect(save).not.toBeNull();
+
+    await act(async () => {
+      inputValue(dom.window, modelInput as HTMLInputElement, "gpt-5.2");
+      save?.click();
+      await flush(dom.window);
+    });
+
+    expect(chromeStub.storage.local.set).toHaveBeenCalledWith(
+      expect.objectContaining({ openaiModel: "gpt-5.2" }),
       expect.any(Function)
     );
   });

@@ -2,8 +2,13 @@ import { Result } from "@praha/byethrow";
 import type { LocalStorageData } from "@/storage/types";
 import { toErrorMessage } from "@/utils/errors";
 
-export const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
-export const OPENAI_MODEL_OPTIONS = [DEFAULT_OPENAI_MODEL, "gpt-4o"] as const;
+export const DEFAULT_OPENAI_MODEL = "gpt-5.2";
+export const OPENAI_MODEL_OPTIONS = [
+  "gpt-5.2",
+  "gpt-5.1",
+  "gpt-4o",
+  "gpt-4o-mini",
+] as const;
 
 export type OpenAiModelOption = (typeof OPENAI_MODEL_OPTIONS)[number];
 
