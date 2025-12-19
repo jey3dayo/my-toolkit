@@ -46,4 +46,4 @@
 - Formatting: Ultracite (Biome) with single quotes and wider line width.
 - Linting: Ultracite (Biome) ruleset, with Chrome extension globals configured.
 - Prefer running `mise run ci` locally to mirror GitHub Actions (format + lint + tests + storybook tests + build).
-- CI: GitHub Actions runs lint + unit tests + storybook tests on push/PR to catch drift early.
+- CI: GitHub Actions runs lightweight checks on PRs/pushes, and runs heavier Storybook/browser checks on merge queue (`merge_group`) to keep PR feedback fast while still gating merges.

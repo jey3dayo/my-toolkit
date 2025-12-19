@@ -140,3 +140,58 @@ export const Ready: Story = {
     });
   },
 };
+
+export const ReadyStylesApplied: Story = {
+  args: {
+    viewModel: {
+      open: true,
+      status: "ready",
+      mode: "text",
+      source: "selection",
+      title: "要約",
+      primary: "要約結果（storybook）",
+      secondary: "選択範囲:\n引用テキスト",
+      anchorRect: null,
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      const host = canvasElement.querySelector<HTMLDivElement>(
+        "#my-browser-utils-overlay"
+      );
+      const shadow = host?.shadowRoot ?? null;
+      expect(host).toBeTruthy();
+      expect(shadow).toBeTruthy();
+      expect(shadow?.querySelector(".mbu-overlay-panel")).toBeTruthy();
+    });
+
+    const host = canvasElement.querySelector<HTMLDivElement>(
+      "#my-browser-utils-overlay"
+    );
+    const shadow = host?.shadowRoot ?? null;
+    const panel = shadow?.querySelector<HTMLElement>(".mbu-overlay-panel");
+
+    if (!(host && shadow && panel)) {
+      throw new Error("overlay host/shadow/panel not mounted");
+    }
+
+    await waitFor(() => {
+      expect(
+        getComputedStyle(host).getPropertyValue("--primitive-space-7").trim()
+      ).toBe("16px");
+    });
+
+    await waitFor(() => {
+      expect(
+        getComputedStyle(host).getPropertyValue("--mbu-surface").trim()
+      ).not.toBe("");
+    });
+
+    await waitFor(() => {
+      const styles = getComputedStyle(panel);
+      expect(styles.display).toBe("grid");
+      expect(styles.borderTopStyle).toBe("solid");
+      expect(styles.borderTopWidth).toBe("1px");
+    });
+  },
+};

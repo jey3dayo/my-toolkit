@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ensurePopupUiBaseStyles, ensureShadowUiBaseStyles } from "@/ui/styles";
 
 describe("UI base styles", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("injects popup base styles once", () => {
     ensurePopupUiBaseStyles(document);
     expect(document.getElementById("mbu-ui-base-styles")).not.toBeNull();
@@ -26,5 +30,33 @@ describe("UI base styles", () => {
     ensureShadowUiBaseStyles(shadow);
     const after = shadow.querySelectorAll("#mbu-ui-base-styles").length;
     expect(after).toBe(before);
+  });
+
+  it("uses chrome.runtime.getURL for href resolution when available", () => {
+    vi.stubGlobal("chrome", {
+      runtime: {
+        getURL: (input: string) => `chrome-extension://test/${input}`,
+      },
+    });
+
+    const host = document.createElement("div");
+    const shadow = host.attachShadow({ mode: "open" });
+    ensureShadowUiBaseStyles(shadow);
+
+    expect(
+      shadow
+        .querySelector<HTMLLinkElement>("#mbu-ui-token-primitives")
+        ?.getAttribute("href")
+    ).toBe("chrome-extension://test/src/styles/tokens/primitives.css");
+    expect(
+      shadow
+        .querySelector<HTMLLinkElement>("#mbu-ui-token-semantic")
+        ?.getAttribute("href")
+    ).toBe("chrome-extension://test/src/styles/tokens/semantic.css");
+    expect(
+      shadow
+        .querySelector<HTMLLinkElement>("#mbu-ui-base-styles")
+        ?.getAttribute("href")
+    ).toBe("chrome-extension://test/src/styles/tokens/components.css");
   });
 });
