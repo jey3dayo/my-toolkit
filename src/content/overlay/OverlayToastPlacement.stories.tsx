@@ -23,7 +23,7 @@ function OverlayToastPlacementStory(): React.JSX.Element {
     applyTheme("dark", shadowRoot);
 
     host.style.left = "auto";
-    host.style.right = "16px";
+    host.style.right = "40px";
     host.style.top = "16px";
     setShadow(shadowRoot);
   }, []);

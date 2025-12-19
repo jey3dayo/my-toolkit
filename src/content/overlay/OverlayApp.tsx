@@ -168,7 +168,7 @@ function positionOverlayHost(params: {
   const anchor = params.anchorRect;
   if (!anchor) {
     updateHostPosition(params.host, size, {
-      left: window.innerWidth - size.width - 16,
+      left: window.innerWidth - size.width - 40,
       top: 16,
     });
     return;
