@@ -28,15 +28,15 @@ function coerceCopyTitleLinkFailure(
   value: unknown
 ): Result.Result<CopyTitleLinkFailure, "invalid"> {
   if (typeof value !== "object" || value === null) {
-    return Result.fail("invalid" as const);
+    return Result.fail("invalid");
   }
   const v = value as Record<string, unknown>;
-  if (typeof v.occurredAt !== "number") return Result.fail("invalid" as const);
-  if (typeof v.tabId !== "number") return Result.fail("invalid" as const);
-  if (typeof v.pageTitle !== "string") return Result.fail("invalid" as const);
-  if (typeof v.pageUrl !== "string") return Result.fail("invalid" as const);
-  if (typeof v.text !== "string") return Result.fail("invalid" as const);
-  if (typeof v.error !== "string") return Result.fail("invalid" as const);
+  if (typeof v.occurredAt !== "number") return Result.fail("invalid");
+  if (typeof v.tabId !== "number") return Result.fail("invalid");
+  if (typeof v.pageTitle !== "string") return Result.fail("invalid");
+  if (typeof v.pageUrl !== "string") return Result.fail("invalid");
+  if (typeof v.text !== "string") return Result.fail("invalid");
+  if (typeof v.error !== "string") return Result.fail("invalid");
   return Result.succeed(value as CopyTitleLinkFailure);
 }
 
