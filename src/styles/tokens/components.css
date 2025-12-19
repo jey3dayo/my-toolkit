@@ -729,6 +729,58 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
   cursor: pointer;
 }
 
+.mbu-radio-group {
+  display: grid;
+  gap: 10px;
+}
+
+.mbu-radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-sub);
+  cursor: pointer;
+  user-select: none;
+}
+
+.mbu-radio-root {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--color-text) 4%, transparent);
+  display: grid;
+  place-items: center;
+}
+
+.mbu-radio-root:hover {
+  background: color-mix(in oklab, var(--color-text) 6%, transparent);
+}
+
+.mbu-radio-root:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.mbu-radio-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  opacity: 0;
+}
+
+.mbu-radio-root[data-checked],
+.mbu-radio-root[aria-checked="true"] {
+  border-color: color-mix(in oklab, var(--color-primary) 35%, var(--line));
+  background: color-mix(in oklab, var(--color-primary) 14%, transparent);
+}
+
+.mbu-radio-root[data-checked] .mbu-radio-indicator,
+.mbu-radio-root[aria-checked="true"] .mbu-radio-indicator {
+  opacity: 1;
+}
+
 .meta-card {
   background: var(--panel-soft);
   border: 1px solid var(--line);

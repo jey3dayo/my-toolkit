@@ -5,11 +5,18 @@ import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
 const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+const alias = { '@': path.join(dirname, 'src') };
 
 export default defineConfig({
+  resolve: {
+    alias,
+  },
   test: {
     projects: [
       {
+        resolve: {
+          alias,
+        },
         test: {
           name: 'unit',
           environment: 'jsdom',
@@ -18,6 +25,9 @@ export default defineConfig({
         },
       },
       {
+        resolve: {
+          alias,
+        },
         plugins: [
           storybookTest({
             configDir: path.join(dirname, '.storybook'),

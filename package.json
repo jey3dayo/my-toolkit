@@ -11,7 +11,7 @@
   },
   "scripts": {
     "build": "pnpm run clean && pnpm run typecheck && pnpm run bundle",
-    "bundle": "esbuild src/background.ts src/content.ts src/popup.ts --bundle --format=iife --platform=browser --target=es2020 --define:process.env.NODE_ENV=\\\"production\\\" --outdir=dist --sourcemap",
+    "bundle": "esbuild src/background.ts src/content.ts src/popup.ts --bundle --format=iife --platform=browser --target=es2020 --alias:@=./src --define:process.env.NODE_ENV=\\\"production\\\" --outdir=dist --sourcemap",
     "typecheck": "tsc --noEmit",
     "watch": "pnpm run bundle --watch",
     "clean": "rm -rf dist",

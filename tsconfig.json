@@ -5,6 +5,10 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "lib": ["ES2020", "DOM"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,

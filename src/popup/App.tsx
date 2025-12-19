@@ -1,8 +1,8 @@
 import { Dialog, Tabs } from '@base-ui/react';
 import { Button } from '@base-ui/react/button';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Icon } from '../components/icon';
-import { createNotifications, ToastHost } from '../ui/toast';
+import { Icon } from '@/components/icon';
+import { createNotifications, ToastHost } from '@/ui/toast';
 import { coercePaneId, getPaneIdFromHash, type PaneId } from './panes';
 import { ActionsPane } from './panes/ActionsPane';
 import { CreateLinkPane } from './panes/CreateLinkPane';
