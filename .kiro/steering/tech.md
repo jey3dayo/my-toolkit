@@ -44,4 +44,4 @@
 - Tests: `vitest` (unit `jsdom`) + Storybook tests (Vitest browser + Playwright) to keep UI behavior/a11y from drifting.
 - Formatting: Ultracite (Biome) with single quotes and wider line width.
 - Linting: Ultracite (Biome) ruleset, with Chrome extension globals configured.
-- CI: GitHub Actions runs lint + unit tests + storybook tests on push/PR to catch drift early.
+- CI: GitHub Actions runs lightweight checks on PRs/pushes, and runs heavier Storybook/browser checks on merge queue (`merge_group`) to keep PR feedback fast while still gating merges.
