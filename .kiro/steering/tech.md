@@ -9,6 +9,7 @@
 
 - TypeScript with `strict` enabled.
 - `tsconfig` uses modern ESM + `moduleResolution: bundler` (and `jsx: react-jsx`) to align with `esbuild`.
+- Imports use the `@/` alias for `src/` (TypeScript `paths`, `esbuild --alias`, and Vitest `resolve.alias`) to keep code consistent across runtimes/tests.
 - Bundling via `esbuild` into `dist/`:
   - Entry points are bundled as browser-friendly IIFEs.
   - Target is modern browsers (`ES2020`) with sourcemaps.
@@ -44,4 +45,5 @@
 - Tests: `vitest` (unit `jsdom`) + Storybook tests (Vitest browser + Playwright) to keep UI behavior/a11y from drifting.
 - Formatting: Ultracite (Biome) with single quotes and wider line width.
 - Linting: Ultracite (Biome) ruleset, with Chrome extension globals configured.
+- Prefer running `mise run ci` locally to mirror GitHub Actions (format + lint + tests + storybook tests + build).
 - CI: GitHub Actions runs lightweight checks on PRs/pushes, and runs heavier Storybook/browser checks on merge queue (`merge_group`) to keep PR feedback fast while still gating merges.

@@ -5,9 +5,11 @@
 - Root contains extension assets (`manifest.json`, `popup.html`, `content.css`, icons/images).
 - `popup_bootstrap.js` loads the bundled popup script (`dist/popup.js`) and shows a clear banner when build output is missing (dev ergonomics).
 - `src/` contains TypeScript/React source for each runtime surface (background/content/popup) plus shared utilities.
+- `src/components/` contains small reusable React components shared between popup and in-page overlays.
 - `src/styles/` holds design-token CSS and base styles; popup links them directly and Shadow DOM UIs inject them programmatically.
 - `src/ui/` contains cross-cutting UI plumbing (theme application, stylesheet injection, toast/notifications).
 - `src/` is intentionally modular: shared helpers live under `src/utils/` and feature code lives under folders like `src/popup/` and `src/content/`.
+- Popup features are pane-based: add a new utility as a pane under `src/popup/panes/` and register it in `src/popup/panes.ts`.
 - `.storybook/` config supports developing/testing UI components outside the extension shell.
 - `dist/` is generated build output (bundled JS); it is treated as an artifact, not a source of truth.
 - `tests/` contains Vitest tests (unit `jsdom`, plus Storybook/browser tests).

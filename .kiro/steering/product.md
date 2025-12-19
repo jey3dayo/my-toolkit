@@ -8,6 +8,7 @@ My Browser Utils is a personal Chrome extension that adds small, high-leverage u
 
 - Make tabular web UIs easier to work with (click-to-sort, including dynamically inserted tables).
 - Provide lightweight “AI actions” on selected text or page content from the context menu (e.g., summarize/translate; calendar extraction is supported).
+- Provide quick “link utilities” (copy the current tab’s title + URL) from the popup and/or context menu.
 
 ## Core Capabilities (patterns, not a catalog)
 
@@ -31,6 +32,11 @@ My Browser Utils is a personal Chrome extension that adds small, high-leverage u
 - Actions support simple template variables (e.g. `{{text}}`, `{{title}}`, `{{url}}`, `{{source}}`) to reuse metadata in prompts.
 - Secrets (OpenAI API token) are configured by the user; the extension guides the user to settings when missing.
 - “Calendar” actions extract a structured event and provide handoff options (Google Calendar link; optional `.ics` export).
+
+### Link utilities (non-AI)
+
+- Provide a small popup utility to copy the current tab’s title + URL in a reusable format (e.g. Markdown), without leaving the page.
+- Offer a context-menu “copy title + link” action for one-step capture; if direct clipboard copy fails, fall back to an in-page overlay that the user can copy from manually.
 
 ## UX Principles
 
