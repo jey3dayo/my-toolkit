@@ -19,6 +19,7 @@ import { ensureOpenAiTokenConfigured } from "@/popup/token_guard";
 import type { ExtractedEvent } from "@/shared_types";
 import type { Notifier } from "@/ui/toast";
 import { buildIcs, sanitizeFileName } from "@/utils/ics";
+import { isRecord } from "@/utils/guards";
 
 type OutputState =
   | { status: "idle" }
@@ -44,7 +45,7 @@ export type ActionsPaneProps = {
 function isRunContextActionResponse(
   value: unknown
 ): value is RunContextActionResponse {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return false;
   }
   const v = value as { ok?: unknown };
@@ -75,7 +76,7 @@ function coerceKind(value: unknown): ContextActionKind | null {
 }
 
 function coerceExtractedEvent(value: unknown): ExtractedEvent | null {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return null;
   }
   const raw = value as Partial<ExtractedEvent>;

@@ -1,3 +1,5 @@
+import { isRecord } from "@/utils/guards";
+
 export type ContextActionKind = "text" | "event";
 
 export type ContextAction = {
@@ -42,7 +44,7 @@ export const DEFAULT_CONTEXT_ACTIONS: ContextAction[] = [
 ];
 
 function coerceContextAction(value: unknown): ContextAction | null {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return null;
   }
   const raw = value as Partial<ContextAction>;

@@ -179,6 +179,15 @@ function buildCopyTitleLinkFallbackSecondary(errorMessage: string): string {
   ].join("\n");
 }
 
+type ContextMenuTabParams = {
+  tabId: number;
+  tab?: chrome.tabs.Tab;
+};
+
+type ContextMenuTargetParams = ContextMenuTabParams & {
+  selection: string;
+};
+
 async function showCopyTitleLinkOverlay(params: {
   tabId: number;
   text: string;
@@ -195,10 +204,9 @@ async function showCopyTitleLinkOverlay(params: {
   } satisfies ContentScriptMessage);
 }
 
-async function handleCopyTitleLinkContextMenuClick(params: {
-  tabId: number;
-  tab?: chrome.tabs.Tab;
-}): Promise<void> {
+async function handleCopyTitleLinkContextMenuClick(
+  params: ContextMenuTabParams
+): Promise<void> {
   const title = params.tab?.title?.trim() ?? "";
   const url = params.tab?.url?.trim() ?? "";
   const text = title && url ? `${title}\n${url}` : url || title;
@@ -290,11 +298,9 @@ async function showContextActionLoadingOverlay(
   });
 }
 
-async function resolveTargetFromContextMenuClick(params: {
-  tabId: number;
-  selection: string;
-  tab?: chrome.tabs.Tab;
-}): Promise<SummaryTarget> {
+async function resolveTargetFromContextMenuClick(
+  params: ContextMenuTargetParams
+): Promise<SummaryTarget> {
   if (params.selection) {
     return {
       text: params.selection,
@@ -405,17 +411,15 @@ async function handleEventAction(context: OverlayContext): Promise<void> {
     return;
   }
 
-  const calendarUrl = buildGoogleCalendarUrl(result.event);
-  if (!calendarUrl) {
+  const calendarData = buildEventCalendarData(result.event);
+  if (!calendarData.ok) {
     await sendMessageToTab(tabId, {
       action: "showActionOverlay",
       status: "error",
       mode: "event",
       source: target.source,
       title: resolvedTitle,
-      primary: `日時の解析に失敗しました（Googleカレンダーリンクを生成できません）\nstart: ${result.event.start}${
-        result.event.end ? `\nend: ${result.event.end}` : ""
-      }`,
+      primary: calendarData.error,
       secondary: selectionSecondary,
     });
     return;
@@ -428,9 +432,9 @@ async function handleEventAction(context: OverlayContext): Promise<void> {
     mode: "event",
     source: target.source,
     title: resolvedTitle,
-    primary: formatEventText(result.event),
+    primary: calendarData.eventText,
     secondary: selectionSecondary,
-    calendarUrl,
+    calendarUrl: calendarData.calendarUrl,
     ics,
     event: result.event,
   });
@@ -620,6 +624,32 @@ async function ensureContextActionsInitialized(): Promise<ContextAction[]> {
   return DEFAULT_CONTEXT_ACTIONS;
 }
 
+type ExtractEventWithCalendarDataResult =
+  | { ok: false; error: string }
+  | { ok: true; event: ExtractedEvent; calendarUrl: string; eventText: string };
+
+async function extractEventWithCalendarData(
+  target: SummaryTarget,
+  extraInstruction?: string
+): Promise<ExtractEventWithCalendarDataResult> {
+  const result = await extractEventWithOpenAI(target, extraInstruction);
+  if (!result.ok) {
+    return result;
+  }
+
+  const calendarData = buildEventCalendarData(result.event);
+  if (!calendarData.ok) {
+    return { ok: false, error: calendarData.error };
+  }
+
+  return {
+    ok: true,
+    event: result.event,
+    calendarUrl: calendarData.calendarUrl,
+    eventText: calendarData.eventText,
+  };
+}
+
 // Helper function for handling event actions in message listener
 async function handleEventActionInMessage(
   _tabId: number,
@@ -630,21 +660,10 @@ async function handleEventActionInMessage(
   const extraInstruction = action.prompt?.trim()
     ? renderInstructionTemplate(action.prompt, target)
     : undefined;
-  const result = await extractEventWithOpenAI(target, extraInstruction);
+  const result = await extractEventWithCalendarData(target, extraInstruction);
 
   if (!result.ok) {
     sendResponse(result);
-    return;
-  }
-
-  const calendarUrl = buildGoogleCalendarUrl(result.event);
-  if (!calendarUrl) {
-    sendResponse({
-      ok: false,
-      error: `日時の解析に失敗しました（Googleカレンダーリンクを生成できません）\nstart: ${result.event.start}${
-        result.event.end ? `\nend: ${result.event.end}` : ""
-      }`,
-    });
     return;
   }
 
@@ -652,8 +671,8 @@ async function handleEventActionInMessage(
     ok: true,
     resultType: "event",
     event: result.event,
-    calendarUrl,
-    eventText: formatEventText(result.event),
+    calendarUrl: result.calendarUrl,
+    eventText: result.eventText,
     source: target.source,
   });
 }
@@ -697,29 +716,8 @@ async function handleSummarizeEventInMessage(
         }
   ) => void
 ): Promise<void> {
-  const result = await extractEventWithOpenAI(target);
-  if (!result.ok) {
-    sendResponse(result);
-    return;
-  }
-
-  const calendarUrl = buildGoogleCalendarUrl(result.event);
-  if (!calendarUrl) {
-    sendResponse({
-      ok: false,
-      error: `日時の解析に失敗しました（Googleカレンダーリンクを生成できません）\nstart: ${result.event.start}${
-        result.event.end ? `\nend: ${result.event.end}` : ""
-      }`,
-    });
-    return;
-  }
-
-  sendResponse({
-    ok: true,
-    event: result.event,
-    calendarUrl,
-    eventText: formatEventText(result.event),
-  });
+  const result = await extractEventWithCalendarData(target);
+  sendResponse(result);
 }
 
 chrome.runtime.onMessage.addListener(
@@ -1423,6 +1421,24 @@ function formatEventText(event: ExtractedEvent): string {
     lines.push(event.description);
   }
   return lines.join("\n");
+}
+
+function buildGoogleCalendarUrlFailureMessage(event: ExtractedEvent): string {
+  return `日時の解析に失敗しました（Googleカレンダーリンクを生成できません）\nstart: ${event.start}${
+    event.end ? `\nend: ${event.end}` : ""
+  }`;
+}
+
+function buildEventCalendarData(
+  event: ExtractedEvent
+):
+  | { ok: true; calendarUrl: string; eventText: string }
+  | { ok: false; error: string } {
+  const calendarUrl = buildGoogleCalendarUrl(event);
+  if (!calendarUrl) {
+    return { ok: false, error: buildGoogleCalendarUrlFailureMessage(event) };
+  }
+  return { ok: true, calendarUrl, eventText: formatEventText(event) };
 }
 
 function buildGoogleCalendarUrl(event: ExtractedEvent): string | null {
