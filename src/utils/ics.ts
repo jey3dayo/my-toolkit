@@ -1,6 +1,6 @@
-import { formatUtcDateTimeFromDate } from "@/date_utils";
-import { computeEventDateRange } from "@/event_date_range";
 import type { ExtractedEvent } from "@/shared_types";
+import { formatUtcDateTimeFromDate } from "@/utils/date_utils";
+import { computeEventDateRange } from "@/utils/event_date_range";
 
 export function sanitizeFileName(name: string): string {
   const trimmed = name.trim() || "event";

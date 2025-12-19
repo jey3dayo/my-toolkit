@@ -5,11 +5,11 @@ import {
   nextDateYyyyMmDd,
   parseDateOnlyToYyyyMmDd,
   parseDateTimeLoose,
-} from "@/date_utils";
+} from "@/utils/date_utils";
 
 const YYYYMMDD_REGEX = /^\d{8}$/;
 
-describe("src/date_utils.ts", () => {
+describe("src/utils/date_utils.ts", () => {
   it("parses date-only inputs to YYYYMMDD", () => {
     expect(parseDateOnlyToYyyyMmDd("2025-1-2")).toBe("20250102");
     expect(parseDateOnlyToYyyyMmDd("2025/01/02")).toBe("20250102");

@@ -5,7 +5,7 @@ import {
   nextDateYyyyMmDd,
   parseDateOnlyToYyyyMmDd,
   parseDateTimeLoose,
-} from "@/date_utils";
+} from "@/utils/date_utils";
 
 export type EventDateRange =
   | { kind: "allDay"; startYyyyMmDd: string; endYyyyMmDdExclusive: string }

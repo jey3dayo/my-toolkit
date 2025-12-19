@@ -6,7 +6,6 @@ import {
   DEFAULT_CONTEXT_ACTIONS,
   normalizeContextActions,
 } from "@/context_actions";
-import { buildIcs, sanitizeFileName } from "@/ics";
 import type { PaneId } from "@/popup/panes";
 import { ActionButtons } from "@/popup/panes/actions/ActionButtons";
 import { ActionEditorPanel } from "@/popup/panes/actions/ActionEditorPanel";
@@ -19,6 +18,7 @@ import type {
 import { ensureOpenAiTokenConfigured } from "@/popup/token_guard";
 import type { ExtractedEvent } from "@/shared_types";
 import type { Notifier } from "@/ui/toast";
+import { buildIcs, sanitizeFileName } from "@/utils/ics";
 
 type OutputState =
   | { status: "idle" }

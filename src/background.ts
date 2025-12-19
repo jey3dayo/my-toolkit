@@ -6,13 +6,16 @@ import {
   DEFAULT_CONTEXT_ACTIONS,
   normalizeContextActions,
 } from "@/context_actions";
-import { parseDateOnlyToYyyyMmDd, parseDateTimeLoose } from "@/date_utils";
-import { computeEventDateRange } from "@/event_date_range";
-import { buildIcs } from "@/ics";
 import { loadOpenAiModel, loadOpenAiSettings } from "@/openai/settings";
 import type { ExtractedEvent, SummarySource } from "@/shared_types";
 import type { CopyTitleLinkFailure, LocalStorageData } from "@/storage/types";
+import {
+  parseDateOnlyToYyyyMmDd,
+  parseDateTimeLoose,
+} from "@/utils/date_utils";
 import { toErrorMessage } from "@/utils/errors";
+import { computeEventDateRange } from "@/utils/event_date_range";
+import { buildIcs } from "@/utils/ics";
 import { safeParseJsonObject } from "@/utils/json";
 import {
   fetchOpenAiChatCompletionOk,
