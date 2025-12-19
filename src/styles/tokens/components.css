@@ -224,7 +224,8 @@
 }
 
 .mbu-toast-root[data-has-description="true"] .mbu-toast-indicator {
-  margin-top: 3px;
+  margin-top: 0;
+  align-self: center;
 }
 
 .mbu-toast-text {
