@@ -192,7 +192,7 @@ jobs:
           echo "💻 Code changes detected"
 
           require_storybook=0
-          if [ "$event_name" = "merge_group" ]; then
+          if [ "$event_name" = "merge_group" ] || [ "$event_name" = "workflow_dispatch" ]; then
             require_storybook=1
           fi
 
