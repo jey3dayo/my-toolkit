@@ -45,7 +45,14 @@ runs:
           else
             # 通常のpushの場合はGitHubコンテキストを使用
             echo "Using GitHub context: $before_sha..$current_sha"
-            changed_files=$(git diff --name-only "$before_sha..$current_sha")
+
+            # force-push などで before_sha が到達不能な場合があるためフォールバック
+            if git rev-parse --verify "$before_sha^{commit}" >/dev/null 2>&1; then
+              changed_files=$(git diff --name-only "$before_sha..$current_sha")
+            else
+              echo "Before SHA not accessible (possibly force push). Listing all files"
+              changed_files=$(git ls-tree -r --name-only "$current_sha")
+            fi
           fi
         fi
 
