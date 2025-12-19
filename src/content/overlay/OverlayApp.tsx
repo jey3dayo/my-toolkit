@@ -618,18 +618,31 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
   }, [viewModel.open]);
 
   useLayoutEffect(() => {
-    positionOverlayHost({
-      open: viewModel.open,
-      host: props.host,
-      size: panelSize,
-      pinned,
-      pinnedPos,
-      anchorRect: viewModel.anchorRect,
-    });
-    updateOverlayToastSurfaceInset({
-      host: props.host,
-      panel: panelRef.current,
-    });
+    const updatePosition = (): void => {
+      positionOverlayHost({
+        open: viewModel.open,
+        host: props.host,
+        size: panelSize,
+        pinned,
+        pinnedPos,
+        anchorRect: viewModel.anchorRect,
+      });
+      updateOverlayToastSurfaceInset({
+        host: props.host,
+        panel: panelRef.current,
+      });
+    };
+
+    updatePosition();
+
+    if (!viewModel.open) {
+      return;
+    }
+
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+    };
   }, [
     props.host,
     viewModel.open,
