@@ -16,7 +16,7 @@ runs:
       run: |
         set -euo pipefail
 
-        # PRの場合は base との差分を取得、pushの場合はGitHubコンテキストを使用
+        # PRの場合は base との差分を取得、merge_group/push の場合はGitHubコンテキストを使用
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           base_ref="${{ github.event.pull_request.base.sha }}"
 
@@ -33,6 +33,16 @@ runs:
           fi
 
           changed_files=$(git diff --name-only "$base_ref..HEAD")
+        elif [ "${{ github.event_name }}" = "merge_group" ]; then
+          base_sha="${{ github.event.merge_group.base_sha }}"
+          head_sha="${{ github.event.merge_group.head_sha }}"
+
+          if [ -z "$base_sha" ] || [ -z "$head_sha" ]; then
+            echo "merge_group payload missing base_sha/head_sha, falling back to HEAD~1..HEAD"
+            changed_files=$(git diff --name-only "HEAD~1..HEAD")
+          else
+            changed_files=$(git diff --name-only "$base_sha..$head_sha")
+          fi
         else
           # pushの場合はGitHubコンテキストを使用（初回コミットやshallow cloneに対応）
           before_sha="${{ github.event.before }}"

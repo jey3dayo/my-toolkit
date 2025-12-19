@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  merge_group:
   push:
   workflow_dispatch:
 
@@ -98,7 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs-only == 'false'
+    if: needs.detect-changes.outputs.docs-only == 'false' && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
 
     steps:
       - name: Checkout
@@ -143,6 +144,7 @@ jobs:
         env:
           DETECT_CHANGES_RESULT: ${{ needs.detect-changes.result }}
           DOCS_ONLY: ${{ needs.detect-changes.outputs.docs-only }}
+          EVENT_NAME: ${{ github.event_name }}
           ACTIONLINT_RESULT: ${{ needs.actionlint.result }}
           LINT_RESULT: ${{ needs.lint.result }}
           TEST_RESULT: ${{ needs.test.result }}
@@ -163,6 +165,7 @@ jobs:
           fi
 
           docs_only="${DOCS_ONLY:-false}"
+          event_name="${EVENT_NAME:-}"
 
           if [ "$docs_only" = "true" ]; then
             result="${DOCS_GATE_RESULT}"
@@ -188,6 +191,11 @@ jobs:
 
           echo "💻 Code changes detected"
 
+          require_storybook=0
+          if [ "$event_name" = "merge_group" ]; then
+            require_storybook=1
+          fi
+
           failed=0
           if [ "$ACTIONLINT_RESULT" != "success" ]; then
             echo "❌ Actionlint FAILED ($ACTIONLINT_RESULT)"
@@ -205,16 +213,24 @@ jobs:
             echo "❌ Build FAILED ($BUILD_RESULT)"
             failed=1
           fi
-          if [ "$STORYBOOK_RESULT" != "success" ]; then
-            echo "❌ Storybook FAILED ($STORYBOOK_RESULT)"
-            failed=1
+          if [ "$require_storybook" -eq 1 ]; then
+            if [ "$STORYBOOK_RESULT" != "success" ]; then
+              echo "❌ Storybook FAILED ($STORYBOOK_RESULT)"
+              failed=1
+            fi
+          else
+            echo "ℹ️ Storybook not required for event: $event_name (result: $STORYBOOK_RESULT)"
           fi
 
           if [ "$failed" -eq 0 ]; then
             echo "✅ Quality Gate PASSED"
             {
               echo "## ✅ Quality Gate: PASSED"
-              echo "All required checks have been completed successfully."
+              if [ "$require_storybook" -eq 1 ]; then
+                echo "All required checks (including Storybook) have been completed successfully."
+              else
+                echo "All required checks have been completed successfully."
+              fi
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
