@@ -3,6 +3,7 @@ import { Form } from "@base-ui/react/form";
 import { Input } from "@base-ui/react/input";
 import { ScrollArea } from "@base-ui/react/scroll-area";
 import { Toggle } from "@base-ui/react/toggle";
+import { Result } from "@praha/byethrow";
 import { useEffect, useState } from "react";
 import type { PopupPaneBaseProps } from "@/popup/panes/types";
 import type { EnableTableSortMessage } from "@/popup/runtime";
@@ -27,18 +28,18 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const data = await props.runtime.storageSyncGet([
-          "domainPatterns",
-          "autoEnableSort",
-        ]);
-        if (!cancelled) {
-          setAutoEnable(Boolean(data.autoEnableSort));
-          setPatterns(normalizePatterns(data.domainPatterns));
-        }
-      } catch {
-        // no-op
+      const data = await props.runtime.storageSyncGet([
+        "domainPatterns",
+        "autoEnableSort",
+      ]);
+      if (Result.isFailure(data)) {
+        return;
       }
+      if (cancelled) {
+        return;
+      }
+      setAutoEnable(Boolean(data.value.autoEnableSort));
+      setPatterns(normalizePatterns(data.value.domainPatterns));
     })().catch(() => {
       // no-op
     });
@@ -48,36 +49,40 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
   }, [props.runtime]);
 
   const enableNow = async (): Promise<void> => {
-    try {
-      const tabId = await props.runtime.getActiveTabId();
-      if (tabId === null) {
-        props.notify.error("有効なタブが見つかりません");
-        return;
-      }
-
-      await props.runtime.sendMessageToTab<EnableTableSortMessage, unknown>(
-        tabId,
-        { action: "enableTableSort" }
-      );
-      props.notify.success("テーブルソートを有効化しました");
-    } catch (error) {
-      props.notify.error(
-        error instanceof Error
-          ? error.message
-          : "テーブルソートの有効化に失敗しました"
-      );
+    const tabIdResult = await props.runtime.getActiveTabId();
+    if (Result.isFailure(tabIdResult)) {
+      props.notify.error(tabIdResult.error);
+      return;
     }
+    const tabId = tabIdResult.value;
+    if (tabId === null) {
+      props.notify.error("有効なタブが見つかりません");
+      return;
+    }
+
+    const sent = await props.runtime.sendMessageToTab<
+      EnableTableSortMessage,
+      unknown
+    >(tabId, { action: "enableTableSort" });
+    if (Result.isFailure(sent)) {
+      props.notify.error(sent.error);
+      return;
+    }
+
+    props.notify.success("テーブルソートを有効化しました");
   };
 
   const toggleAutoEnable = async (checked: boolean): Promise<void> => {
     setAutoEnable(checked);
-    try {
-      await props.runtime.storageSyncSet({ autoEnableSort: checked });
+    const saved = await props.runtime.storageSyncSet({
+      autoEnableSort: checked,
+    });
+    if (Result.isSuccess(saved)) {
       props.notify.success("保存しました");
-    } catch {
-      props.notify.error("保存に失敗しました");
-      setAutoEnable(!checked);
+      return;
     }
+    props.notify.error("保存に失敗しました");
+    setAutoEnable(!checked);
   };
 
   const addPattern = async (): Promise<void> => {
@@ -95,25 +100,25 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
     const next = [...patterns, raw];
     setPatterns(next);
     setPatternInput("");
-    try {
-      await props.runtime.storageSyncSet({ domainPatterns: next });
+    const saved = await props.runtime.storageSyncSet({ domainPatterns: next });
+    if (Result.isSuccess(saved)) {
       props.notify.success("追加しました");
-    } catch {
-      props.notify.error("追加に失敗しました");
-      setPatterns(patterns);
+      return;
     }
+    props.notify.error("追加に失敗しました");
+    setPatterns(patterns);
   };
 
   const removePattern = async (pattern: string): Promise<void> => {
     const next = patterns.filter((item) => item !== pattern);
     setPatterns(next);
-    try {
-      await props.runtime.storageSyncSet({ domainPatterns: next });
+    const saved = await props.runtime.storageSyncSet({ domainPatterns: next });
+    if (Result.isSuccess(saved)) {
       props.notify.success("削除しました");
-    } catch {
-      props.notify.error("削除に失敗しました");
-      setPatterns(patterns);
+      return;
     }
+    props.notify.error("削除に失敗しました");
+    setPatterns(patterns);
   };
 
   return (

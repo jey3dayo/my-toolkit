@@ -1,6 +1,7 @@
 import { Button } from "@base-ui/react/button";
 import { Input } from "@base-ui/react/input";
 import { Select } from "@base-ui/react/select";
+import { Result } from "@praha/byethrow";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   formatLink,
@@ -37,17 +38,18 @@ export function CreateLinkPane(props: CreateLinkPaneProps): React.JSX.Element {
       setLoading(true);
       try {
         const activeTab = await props.runtime.getActiveTab();
-        if (!activeTab) {
+        if (Result.isFailure(activeTab)) {
+          notify?.error(activeTab.error);
+          return;
+        }
+
+        if (!activeTab.value) {
           notify?.error("有効なタブが見つかりません");
           return;
         }
-        setTitle(activeTab.title ?? "");
-        setUrl(activeTab.url ?? "");
+        setTitle(activeTab.value.title ?? "");
+        setUrl(activeTab.value.url ?? "");
         notify?.success("現在のタブから更新しました");
-      } catch (error) {
-        notify?.error(
-          error instanceof Error ? error.message : "取得に失敗しました"
-        );
       } finally {
         setLoading(false);
       }

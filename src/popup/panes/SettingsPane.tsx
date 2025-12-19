@@ -8,6 +8,7 @@ import { RadioGroup } from "@base-ui/react/radio-group";
 import { Select } from "@base-ui/react/select";
 import { Separator } from "@base-ui/react/separator";
 import { Toggle } from "@base-ui/react/toggle";
+import { Result } from "@praha/byethrow";
 import { useEffect, useId, useState } from "react";
 import {
   DEFAULT_OPENAI_MODEL,
@@ -53,25 +54,24 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const data = await props.runtime.storageLocalGet([
-          "openaiApiToken",
-          "openaiCustomPrompt",
-          "openaiModel",
-          "theme",
-        ]);
-        const raw = data as Partial<LocalStorageData>;
-        if (cancelled) {
-          return;
-        }
-        setToken(raw.openaiApiToken ?? "");
-        setCustomPrompt(raw.openaiCustomPrompt ?? "");
-        setModel(normalizeOpenAiModel(raw.openaiModel));
-        setTheme(isTheme(raw.theme) ? raw.theme : "auto");
-        applyTheme(isTheme(raw.theme) ? raw.theme : "auto", document);
-      } catch {
-        // no-op
+      const loaded = await props.runtime.storageLocalGet([
+        "openaiApiToken",
+        "openaiCustomPrompt",
+        "openaiModel",
+        "theme",
+      ]);
+      if (Result.isFailure(loaded)) {
+        return;
       }
+      const raw: Partial<LocalStorageData> = loaded.value;
+      if (cancelled) {
+        return;
+      }
+      setToken(raw.openaiApiToken ?? "");
+      setCustomPrompt(raw.openaiCustomPrompt ?? "");
+      setModel(normalizeOpenAiModel(raw.openaiModel));
+      setTheme(isTheme(raw.theme) ? raw.theme : "auto");
+      applyTheme(isTheme(raw.theme) ? raw.theme : "auto", document);
     })().catch(() => {
       // no-op
     });
@@ -81,114 +81,120 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
   }, [props.runtime]);
 
   const saveToken = async (): Promise<void> => {
-    try {
-      await props.runtime.storageLocalSet({ openaiApiToken: token });
+    const saved = await props.runtime.storageLocalSet({
+      openaiApiToken: token,
+    });
+    if (Result.isSuccess(saved)) {
       props.notify.success("保存しました");
-    } catch {
-      props.notify.error("保存に失敗しました");
+      return;
     }
+    props.notify.error("保存に失敗しました");
   };
 
   const clearToken = async (): Promise<void> => {
-    try {
-      await props.runtime.storageLocalRemove("openaiApiToken");
+    const removed = await props.runtime.storageLocalRemove("openaiApiToken");
+    if (Result.isSuccess(removed)) {
       setToken("");
       props.notify.success("削除しました");
-    } catch {
-      props.notify.error("削除に失敗しました");
+      return;
     }
+    props.notify.error("削除に失敗しました");
   };
 
   const testToken = async (): Promise<void> => {
-    try {
-      const tokenOverride = token.trim() ? token.trim() : undefined;
-      const responseUnknown = await props.runtime.sendMessageToBackground<
-        TestOpenAiTokenRequest,
-        unknown
-      >({
-        action: "testOpenAiToken",
-        token: tokenOverride,
-      });
+    const tokenOverride = token.trim() ? token.trim() : undefined;
+    const responseUnknown = await props.runtime.sendMessageToBackground<
+      TestOpenAiTokenRequest,
+      unknown
+    >({
+      action: "testOpenAiToken",
+      token: tokenOverride,
+    });
 
-      if (!isTestOpenAiTokenResponse(responseUnknown)) {
-        props.notify.error("バックグラウンドの応答が不正です");
-        return;
-      }
-
-      if (responseUnknown.ok) {
-        props.notify.success("トークンOK");
-        return;
-      }
-
+    if (Result.isFailure(responseUnknown)) {
       props.notify.error(responseUnknown.error);
-    } catch (error) {
-      props.notify.error(
-        error instanceof Error ? error.message : "トークン確認に失敗しました"
-      );
+      return;
     }
+
+    if (!isTestOpenAiTokenResponse(responseUnknown.value)) {
+      props.notify.error("バックグラウンドの応答が不正です");
+      return;
+    }
+
+    if (responseUnknown.value.ok) {
+      props.notify.success("トークンOK");
+      return;
+    }
+
+    props.notify.error(responseUnknown.value.error);
   };
 
   const savePrompt = async (): Promise<void> => {
-    try {
-      await props.runtime.storageLocalSet({ openaiCustomPrompt: customPrompt });
+    const saved = await props.runtime.storageLocalSet({
+      openaiCustomPrompt: customPrompt,
+    });
+    if (Result.isSuccess(saved)) {
       props.notify.success("保存しました");
-    } catch {
-      props.notify.error("保存に失敗しました");
+      return;
     }
+    props.notify.error("保存に失敗しました");
   };
 
   const clearPrompt = async (): Promise<void> => {
-    try {
+    const removed =
       await props.runtime.storageLocalRemove("openaiCustomPrompt");
+    if (Result.isSuccess(removed)) {
       setCustomPrompt("");
       props.notify.success("削除しました");
-    } catch {
-      props.notify.error("削除に失敗しました");
+      return;
     }
+    props.notify.error("削除に失敗しました");
   };
 
   const saveModel = async (): Promise<void> => {
     const normalized = normalizeOpenAiModel(model);
-    try {
-      await props.runtime.storageLocalSet({ openaiModel: normalized });
+    const saved = await props.runtime.storageLocalSet({
+      openaiModel: normalized,
+    });
+    if (Result.isSuccess(saved)) {
       setModel(normalized);
       props.notify.success("保存しました");
-    } catch {
-      props.notify.error("保存に失敗しました");
+      return;
     }
+    props.notify.error("保存に失敗しました");
   };
 
   const resetModel = async (): Promise<void> => {
-    try {
-      await props.runtime.storageLocalRemove("openaiModel");
+    const removed = await props.runtime.storageLocalRemove("openaiModel");
+    if (Result.isSuccess(removed)) {
       setModel(DEFAULT_OPENAI_MODEL);
       props.notify.success("デフォルトに戻しました");
-    } catch {
-      props.notify.error("変更に失敗しました");
+      return;
     }
+    props.notify.error("変更に失敗しました");
   };
 
   const saveTheme = async (): Promise<void> => {
     if (!isTheme(theme)) {
       return;
     }
-    try {
-      await props.runtime.storageLocalSet({ theme });
+    const saved = await props.runtime.storageLocalSet({ theme });
+    if (Result.isSuccess(saved)) {
       props.notify.success("保存しました");
-    } catch {
-      props.notify.error("保存に失敗しました");
+      return;
     }
+    props.notify.error("保存に失敗しました");
   };
 
   const resetTheme = async (): Promise<void> => {
-    try {
-      await props.runtime.storageLocalRemove("theme");
+    const removed = await props.runtime.storageLocalRemove("theme");
+    if (Result.isSuccess(removed)) {
       setTheme("auto");
       applyTheme("auto", document);
       props.notify.success("デフォルトに戻しました");
-    } catch {
-      props.notify.error("変更に失敗しました");
+      return;
     }
+    props.notify.error("変更に失敗しました");
   };
 
   return (

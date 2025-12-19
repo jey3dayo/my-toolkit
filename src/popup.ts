@@ -1,3 +1,4 @@
+import { Result } from "@praha/byethrow";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { PopupApp } from "@/popup/App";
@@ -7,12 +8,13 @@ import { applyTheme, isTheme } from "@/ui/theme";
 
 async function initTheme(): Promise<void> {
   const runtime = createPopupRuntime();
-  try {
-    const { theme } = await runtime.storageLocalGet(["theme"]);
-    applyTheme(isTheme(theme) ? theme : "auto", document);
-  } catch {
+  const result = await runtime.storageLocalGet(["theme"]);
+  if (Result.isFailure(result)) {
     applyTheme("auto", document);
+    return;
   }
+  const { theme } = result.value;
+  applyTheme(isTheme(theme) ? theme : "auto", document);
 }
 
 (() => {

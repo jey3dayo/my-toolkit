@@ -1,6 +1,8 @@
+import { Result } from "@praha/byethrow";
 import type { ContextAction } from "@/context_actions";
 import type { ExtractedEvent, SummarySource } from "@/shared_types";
 import type { LocalStorageData } from "@/storage/types";
+import { toErrorMessage } from "@/utils/errors";
 
 export type SyncStorageData = {
   domainPatterns?: string[];
@@ -46,24 +48,28 @@ export type PopupRuntime = {
   isExtensionPage: boolean;
   storageSyncGet: (
     keys: (keyof SyncStorageData)[]
-  ) => Promise<Partial<SyncStorageData>>;
-  storageSyncSet: (items: Partial<SyncStorageData>) => Promise<void>;
+  ) => Result.ResultAsync<Partial<SyncStorageData>, string>;
+  storageSyncSet: (
+    items: Partial<SyncStorageData>
+  ) => Result.ResultAsync<void, string>;
   storageLocalGet: (
     keys: (keyof LocalStorageData)[]
-  ) => Promise<Partial<LocalStorageData>>;
-  storageLocalSet: (items: Partial<LocalStorageData>) => Promise<void>;
+  ) => Result.ResultAsync<Partial<LocalStorageData>, string>;
+  storageLocalSet: (
+    items: Partial<LocalStorageData>
+  ) => Result.ResultAsync<void, string>;
   storageLocalRemove: (
     keys: (keyof LocalStorageData)[] | keyof LocalStorageData
-  ) => Promise<void>;
-  getActiveTab: () => Promise<ActiveTabInfo | null>;
-  getActiveTabId: () => Promise<number | null>;
+  ) => Result.ResultAsync<void, string>;
+  getActiveTab: () => Result.ResultAsync<ActiveTabInfo | null, string>;
+  getActiveTabId: () => Result.ResultAsync<number | null, string>;
   sendMessageToBackground: <TRequest, TResponse>(
     message: TRequest
-  ) => Promise<TResponse>;
+  ) => Result.ResultAsync<TResponse, string>;
   sendMessageToTab: <TRequest, TResponse>(
     tabId: number,
     message: TRequest
-  ) => Promise<TResponse>;
+  ) => Result.ResultAsync<TResponse, string>;
   openUrl: (url: string) => void;
 };
 
@@ -134,20 +140,25 @@ export function createPopupRuntime(): PopupRuntime {
     if (
       !(isExtensionPage && (chrome as unknown as { storage?: unknown }).storage)
     ) {
-      return fallbackStorageGet(
-        "sync",
-        keys.map(String)
-      ) as Partial<SyncStorageData>;
+      return Result.succeed(
+        fallbackStorageGet("sync", keys.map(String)) as Partial<SyncStorageData>
+      );
     }
-    return await new Promise<Partial<SyncStorageData>>((resolve, reject) => {
-      chrome.storage.sync.get(keys as string[], (items) => {
-        const err = chrome.runtime.lastError;
-        if (err) {
-          reject(new Error(err.message));
-          return;
-        }
-        resolve(items as Partial<SyncStorageData>);
-      });
+    return await Result.try({
+      immediate: true,
+      try: () =>
+        new Promise<Partial<SyncStorageData>>((resolve, reject) => {
+          chrome.storage.sync.get(keys as string[], (items) => {
+            const err = chrome.runtime.lastError;
+            if (err) {
+              reject(new Error(err.message));
+              return;
+            }
+            resolve(items as Partial<SyncStorageData>);
+          });
+        }),
+      catch: (error) =>
+        toErrorMessage(error, "同期ストレージの読み込みに失敗しました"),
     });
   };
 
@@ -156,17 +167,23 @@ export function createPopupRuntime(): PopupRuntime {
       !(isExtensionPage && (chrome as unknown as { storage?: unknown }).storage)
     ) {
       fallbackStorageSet("sync", items as Record<string, unknown>);
-      return;
+      return Result.succeed();
     }
-    await new Promise<void>((resolve, reject) => {
-      chrome.storage.sync.set(items as Record<string, unknown>, () => {
-        const err = chrome.runtime.lastError;
-        if (err) {
-          reject(new Error(err.message));
-          return;
-        }
-        resolve();
-      });
+    return await Result.try({
+      immediate: true,
+      try: () =>
+        new Promise<void>((resolve, reject) => {
+          chrome.storage.sync.set(items as Record<string, unknown>, () => {
+            const err = chrome.runtime.lastError;
+            if (err) {
+              reject(new Error(err.message));
+              return;
+            }
+            resolve();
+          });
+        }),
+      catch: (error) =>
+        toErrorMessage(error, "同期ストレージの保存に失敗しました"),
     });
   };
 
@@ -174,20 +191,28 @@ export function createPopupRuntime(): PopupRuntime {
     if (
       !(isExtensionPage && (chrome as unknown as { storage?: unknown }).storage)
     ) {
-      return fallbackStorageGet(
-        "local",
-        keys.map(String)
-      ) as Partial<LocalStorageData>;
+      return Result.succeed(
+        fallbackStorageGet(
+          "local",
+          keys.map(String)
+        ) as Partial<LocalStorageData>
+      );
     }
-    return await new Promise<Partial<LocalStorageData>>((resolve, reject) => {
-      chrome.storage.local.get(keys as string[], (items) => {
-        const err = chrome.runtime.lastError;
-        if (err) {
-          reject(new Error(err.message));
-          return;
-        }
-        resolve(items as Partial<LocalStorageData>);
-      });
+    return await Result.try({
+      immediate: true,
+      try: () =>
+        new Promise<Partial<LocalStorageData>>((resolve, reject) => {
+          chrome.storage.local.get(keys as string[], (items) => {
+            const err = chrome.runtime.lastError;
+            if (err) {
+              reject(new Error(err.message));
+              return;
+            }
+            resolve(items as Partial<LocalStorageData>);
+          });
+        }),
+      catch: (error) =>
+        toErrorMessage(error, "ローカルストレージの読み込みに失敗しました"),
     });
   };
 
@@ -196,17 +221,23 @@ export function createPopupRuntime(): PopupRuntime {
       !(isExtensionPage && (chrome as unknown as { storage?: unknown }).storage)
     ) {
       fallbackStorageSet("local", items as Record<string, unknown>);
-      return;
+      return Result.succeed();
     }
-    await new Promise<void>((resolve, reject) => {
-      chrome.storage.local.set(items as Record<string, unknown>, () => {
-        const err = chrome.runtime.lastError;
-        if (err) {
-          reject(new Error(err.message));
-          return;
-        }
-        resolve();
-      });
+    return await Result.try({
+      immediate: true,
+      try: () =>
+        new Promise<void>((resolve, reject) => {
+          chrome.storage.local.set(items as Record<string, unknown>, () => {
+            const err = chrome.runtime.lastError;
+            if (err) {
+              reject(new Error(err.message));
+              return;
+            }
+            resolve();
+          });
+        }),
+      catch: (error) =>
+        toErrorMessage(error, "ローカルストレージの保存に失敗しました"),
     });
   };
 
@@ -217,72 +248,99 @@ export function createPopupRuntime(): PopupRuntime {
       !(isExtensionPage && (chrome as unknown as { storage?: unknown }).storage)
     ) {
       fallbackStorageRemove("local", keys as string[] | string);
-      return;
+      return Result.succeed();
     }
-    await new Promise<void>((resolve, reject) => {
-      chrome.storage.local.remove(keys as string[] | string, () => {
-        const err = chrome.runtime.lastError;
-        if (err) {
-          reject(new Error(err.message));
-          return;
-        }
-        resolve();
-      });
+    return await Result.try({
+      immediate: true,
+      try: () =>
+        new Promise<void>((resolve, reject) => {
+          chrome.storage.local.remove(keys as string[] | string, () => {
+            const err = chrome.runtime.lastError;
+            if (err) {
+              reject(new Error(err.message));
+              return;
+            }
+            resolve();
+          });
+        }),
+      catch: (error) =>
+        toErrorMessage(error, "ローカルストレージの削除に失敗しました"),
     });
   };
 
   const getActiveTab: PopupRuntime["getActiveTab"] = async () => {
     if (!(isExtensionPage && (chrome as unknown as { tabs?: unknown }).tabs)) {
-      return null;
+      return Result.succeed(null);
     }
-    const tabs = await new Promise<chrome.tabs.Tab[]>((resolve, reject) => {
-      chrome.tabs.query(
-        {
-          active: true,
-          currentWindow: true,
-        },
-        (result) => {
-          const err = chrome.runtime.lastError;
-          if (err) {
-            reject(new Error(err.message));
-            return;
-          }
-          resolve(result);
-        }
-      );
+    return await Result.try({
+      immediate: true,
+      try: () =>
+        new Promise<ActiveTabInfo | null>((resolve, reject) => {
+          chrome.tabs.query(
+            {
+              active: true,
+              currentWindow: true,
+            },
+            (result) => {
+              const err = chrome.runtime.lastError;
+              if (err) {
+                reject(new Error(err.message));
+                return;
+              }
+              const [tab] = result;
+              const id = tab?.id;
+              if (id === undefined) {
+                resolve(null);
+                return;
+              }
+              resolve({ id, title: tab?.title, url: tab?.url });
+            }
+          );
+        }),
+      catch: (error) => toErrorMessage(error, "タブ情報の取得に失敗しました"),
     });
-    const [tab] = tabs;
-    const id = tab?.id;
-    if (id === undefined) {
-      return null;
-    }
-    return { id, title: tab?.title, url: tab?.url };
   };
 
-  const getActiveTabId: PopupRuntime["getActiveTabId"] = async () =>
-    (await getActiveTab())?.id ?? null;
+  const getActiveTabId: PopupRuntime["getActiveTabId"] = async () => {
+    const activeTab = await getActiveTab();
+    if (Result.isFailure(activeTab)) {
+      return activeTab;
+    }
+    return Result.succeed(activeTab.value?.id ?? null);
+  };
 
   const sendMessageToBackground: PopupRuntime["sendMessageToBackground"] =
-    async <TRequest, TResponse>(message: TRequest): Promise<TResponse> => {
+    async <TRequest, TResponse>(
+      message: TRequest
+    ): Promise<Result.Result<TResponse, string>> => {
       if (
         !(
           isExtensionPage &&
           (chrome as unknown as { runtime?: unknown }).runtime
         )
       ) {
-        throw new Error(
+        return Result.fail(
           "拡張機能として開いてください（chrome-extension://...）"
         );
       }
-      return await new Promise<TResponse>((resolve, reject) => {
-        chrome.runtime.sendMessage(message, (response) => {
-          const err = chrome.runtime.lastError;
-          if (err) {
-            reject(new Error(err.message));
-            return;
-          }
-          resolve(response as TResponse);
-        });
+      return await Result.try({
+        immediate: true,
+        try: () =>
+          new Promise<TResponse>((resolve, reject) => {
+            chrome.runtime.sendMessage(message, (response) => {
+              const err = chrome.runtime.lastError;
+              if (err) {
+                reject(new Error(err.message));
+                return;
+              }
+              resolve(response as TResponse);
+            });
+          }),
+        catch: (error) =>
+          toErrorMessage(
+            error,
+            "バックグラウンドへのメッセージ送信に失敗しました"
+          ),
       });
     };
 
@@ -292,19 +350,27 @@ export function createPopupRuntime(): PopupRuntime {
   >(
     tabId: number,
     message: TRequest
-  ): Promise<TResponse> => {
+  ): Promise<Result.Result<TResponse, string>> => {
     if (!(isExtensionPage && (chrome as unknown as { tabs?: unknown }).tabs)) {
-      throw new Error("拡張機能として開いてください（chrome-extension://...）");
+      return Result.fail(
+        "拡張機能として開いてください（chrome-extension://...）"
+      );
     }
-    return await new Promise<TResponse>((resolve, reject) => {
-      chrome.tabs.sendMessage(tabId, message, (response) => {
-        const err = chrome.runtime.lastError;
-        if (err) {
-          reject(new Error(err.message));
-          return;
-        }
-        resolve(response as TResponse);
-      });
+    return await Result.try({
+      immediate: true,
+      try: () =>
+        new Promise<TResponse>((resolve, reject) => {
+          chrome.tabs.sendMessage(tabId, message, (response) => {
+            const err = chrome.runtime.lastError;
+            if (err) {
+              reject(new Error(err.message));
+              return;
+            }
+            resolve(response as TResponse);
+          });
+        }),
+      catch: (error) =>
+        toErrorMessage(error, "タブへのメッセージ送信に失敗しました"),
     });
   };
 

@@ -207,21 +207,23 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
     };
 
     (async () => {
-      try {
-        const data = await props.runtime.storageSyncGet(["contextActions"]);
-        const normalized = normalizeContextActions(data.contextActions);
+      const data = await props.runtime.storageSyncGet(["contextActions"]);
+      if (Result.isSuccess(data)) {
+        const normalized = normalizeContextActions(data.value.contextActions);
         if (normalized.length > 0) {
           setActionsSafe(normalized);
           return;
         }
-
-        setActionsSafe(DEFAULT_CONTEXT_ACTIONS);
-        await props.runtime.storageSyncSet({
-          contextActions: DEFAULT_CONTEXT_ACTIONS,
-        });
-      } catch {
-        setActionsSafe(DEFAULT_CONTEXT_ACTIONS);
       }
+
+      setActionsSafe(DEFAULT_CONTEXT_ACTIONS);
+      await props.runtime
+        .storageSyncSet({
+          contextActions: DEFAULT_CONTEXT_ACTIONS,
+        })
+        .catch(() => {
+          // no-op
+        });
     })().catch(() => {
       // no-op
     });
@@ -292,13 +294,15 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
     setActions(nextActions);
     setEditorId(nextId);
 
-    try {
-      await props.runtime.storageSyncSet({ contextActions: nextActions });
+    const saved = await props.runtime.storageSyncSet({
+      contextActions: nextActions,
+    });
+    if (Result.isSuccess(saved)) {
       props.notify.success("保存しました");
-    } catch {
-      setActions(previous);
-      props.notify.error("保存に失敗しました");
+      return;
     }
+    setActions(previous);
+    props.notify.error("保存に失敗しました");
   };
 
   const deleteEditor = async (): Promise<void> => {
@@ -314,13 +318,15 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
     setEditorKind("text");
     setEditorPrompt("");
 
-    try {
-      await props.runtime.storageSyncSet({ contextActions: nextActions });
+    const saved = await props.runtime.storageSyncSet({
+      contextActions: nextActions,
+    });
+    if (Result.isSuccess(saved)) {
       props.notify.success("削除しました");
-    } catch {
-      setActions(previous);
-      props.notify.error("削除に失敗しました");
+      return;
     }
+    setActions(previous);
+    props.notify.error("削除に失敗しました");
   };
 
   const resetActions = async (): Promise<void> => {
@@ -331,21 +337,20 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
     setEditorKind("text");
     setEditorPrompt("");
 
-    try {
-      await props.runtime.storageSyncSet({
-        contextActions: DEFAULT_CONTEXT_ACTIONS,
-      });
+    const saved = await props.runtime.storageSyncSet({
+      contextActions: DEFAULT_CONTEXT_ACTIONS,
+    });
+    if (Result.isSuccess(saved)) {
       props.notify.success("リセットしました");
-    } catch {
-      setActions(previous);
-      props.notify.error("リセットに失敗しました");
+      return;
     }
+    setActions(previous);
+    props.notify.error("リセットに失敗しました");
   };
 
   const ensureTokenReady = async (): Promise<boolean> => {
     const tokenConfigured = await ensureOpenAiTokenConfigured({
-      storageLocalGet: (keys) =>
-        props.runtime.storageLocalGet(keys as never) as Promise<unknown>,
+      storageLocalGet: (keys) => props.runtime.storageLocalGet(keys),
       showNotification: (message, type) => {
         if (type === "error") {
           props.notify.error(message);
@@ -378,43 +383,45 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
 
     setOutput({ status: "running", title: action.title });
 
-    try {
-      const tabId = await props.runtime.getActiveTabId();
-      if (tabId === null) {
-        props.notify.error("有効なタブが見つかりません");
-        setOutput({ status: "idle" });
-        return;
-      }
-
-      const responseUnknown = await props.runtime.sendMessageToBackground<
-        RunContextActionRequest,
-        unknown
-      >({
-        action: "runContextAction",
-        tabId,
-        actionId,
-      });
-
-      const parsed = parseRunContextActionResponseToOutput({
-        actionTitle: action.title,
-        responseUnknown,
-      });
-      if (!parsed.ok) {
-        props.notify.error(parsed.error);
-        setOutput({ status: "idle" });
-        return;
-      }
-
-      setOutput(parsed.output);
-      props.notify.success("完了しました");
-    } catch (error) {
-      props.notify.error(
-        error instanceof Error
-          ? error.message
-          : "アクションの実行に失敗しました"
-      );
+    const tabIdResult = await props.runtime.getActiveTabId();
+    if (Result.isFailure(tabIdResult)) {
+      props.notify.error(tabIdResult.error);
       setOutput({ status: "idle" });
+      return;
     }
+    const tabId = tabIdResult.value;
+    if (tabId === null) {
+      props.notify.error("有効なタブが見つかりません");
+      setOutput({ status: "idle" });
+      return;
+    }
+
+    const responseUnknown = await props.runtime.sendMessageToBackground<
+      RunContextActionRequest,
+      unknown
+    >({
+      action: "runContextAction",
+      tabId,
+      actionId,
+    });
+    if (Result.isFailure(responseUnknown)) {
+      props.notify.error(responseUnknown.error);
+      setOutput({ status: "idle" });
+      return;
+    }
+
+    const parsed = parseRunContextActionResponseToOutput({
+      actionTitle: action.title,
+      responseUnknown: responseUnknown.value,
+    });
+    if (!parsed.ok) {
+      props.notify.error(parsed.error);
+      setOutput({ status: "idle" });
+      return;
+    }
+
+    setOutput(parsed.output);
+    props.notify.success("完了しました");
   };
 
   const copyOutput = async (): Promise<void> => {

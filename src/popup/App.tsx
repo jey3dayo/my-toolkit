@@ -73,30 +73,22 @@ function coerceCopyTitleLinkFailure(
 }
 
 async function loadCopyTitleLinkFailure(runtime: {
-  storageLocalGet: (keys: ["lastCopyTitleLinkFailure"]) => Promise<unknown>;
+  storageLocalGet: ReturnType<typeof createPopupRuntime>["storageLocalGet"];
 }): Promise<
   | { ok: true; value: CopyTitleLinkFailure }
   | { ok: false; error: "none" | "storage-error" | "invalid" }
 > {
-  const result = await Result.pipe(
-    Result.try({
-      immediate: true,
-      try: () => runtime.storageLocalGet(["lastCopyTitleLinkFailure"]),
-      catch: () => "storage-error" as const,
-    }),
-    Result.map(
-      (data) =>
-        (data as { lastCopyTitleLinkFailure?: unknown })
-          .lastCopyTitleLinkFailure
-    ),
-    Result.andThen((stored) => {
-      if (typeof stored === "undefined") {
-        return Result.fail("none" as const);
-      }
-      return coerceCopyTitleLinkFailure(stored);
-    })
-  );
+  const loaded = await runtime.storageLocalGet(["lastCopyTitleLinkFailure"]);
+  if (Result.isFailure(loaded)) {
+    return { ok: false, error: "storage-error" };
+  }
 
+  const stored = loaded.value.lastCopyTitleLinkFailure;
+  if (typeof stored === "undefined") {
+    return { ok: false, error: "none" };
+  }
+
+  const result = coerceCopyTitleLinkFailure(stored);
   if (Result.isFailure(result)) {
     return { ok: false, error: result.error };
   }
@@ -116,11 +108,7 @@ async function handleCopyTitleLinkFailureOnPopupOpen(params: {
   const failureLoaded = await loadCopyTitleLinkFailure(params.runtime);
   if (!failureLoaded.ok) {
     if (failureLoaded.error === "invalid") {
-      await params.runtime
-        .storageLocalRemove("lastCopyTitleLinkFailure")
-        .catch(() => {
-          // no-op
-        });
+      await params.runtime.storageLocalRemove("lastCopyTitleLinkFailure");
     }
     return;
   }
@@ -129,30 +117,23 @@ async function handleCopyTitleLinkFailureOnPopupOpen(params: {
   const actionAvailable = canUseChromeAction(params.runtime);
 
   if (Date.now() - failure.occurredAt > MAX_AGE_MS) {
-    await params.runtime
-      .storageLocalRemove("lastCopyTitleLinkFailure")
-      .catch(() => {
-        // no-op
-      });
+    await params.runtime.storageLocalRemove("lastCopyTitleLinkFailure");
     if (actionAvailable) {
       clearActionBadgeForTab(failure.tabId);
     }
     return;
   }
 
-  const activeTabId = await params.runtime.getActiveTabId().catch(() => null);
-  if (activeTabId === null) {
+  const activeTabIdResult = await params.runtime.getActiveTabId();
+  if (Result.isFailure(activeTabIdResult)) {
     return;
   }
-  if (activeTabId !== failure.tabId) {
+  const activeTabId = activeTabIdResult.value;
+  if (activeTabId === null || activeTabId !== failure.tabId) {
     return;
   }
 
-  await params.runtime
-    .storageLocalRemove("lastCopyTitleLinkFailure")
-    .catch(() => {
-      // no-op
-    });
+  await params.runtime.storageLocalRemove("lastCopyTitleLinkFailure");
   if (actionAvailable) {
     clearActionBadgeForTab(failure.tabId);
   }

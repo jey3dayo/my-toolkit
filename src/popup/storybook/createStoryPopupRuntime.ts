@@ -1,3 +1,4 @@
+import { Result } from "@praha/byethrow";
 import type {
   ActiveTabInfo,
   PopupRuntime,
@@ -85,40 +86,53 @@ export function createStoryPopupRuntime(options: Options = {}): PopupRuntime {
 
   return {
     isExtensionPage: false,
-    storageSyncGet: sync.get,
-    storageSyncSet: sync.set,
-    storageLocalGet: local.get,
-    storageLocalSet: local.set,
-    storageLocalRemove: local.remove,
-    getActiveTab: async () => activeTab,
-    getActiveTabId: async () => activeTab?.id ?? null,
+    storageSyncGet: async (keys) => Result.succeed(await sync.get(keys)),
+    storageSyncSet: async (items) => {
+      await sync.set(items);
+      return Result.succeed();
+    },
+    storageLocalGet: async (keys) => Result.succeed(await local.get(keys)),
+    storageLocalSet: async (items) => {
+      await local.set(items);
+      return Result.succeed();
+    },
+    storageLocalRemove: async (keys) => {
+      await local.remove(keys);
+      return Result.succeed();
+    },
+    getActiveTab: async () => Result.succeed(activeTab),
+    getActiveTabId: async () => Result.succeed(activeTab?.id ?? null),
     sendMessageToBackground: async (message) => {
       const action = getMessageAction(message);
 
       if (action === "testOpenAiToken") {
         if (options.background?.testOpenAiToken) {
-          return (await options.background.testOpenAiToken(
-            message as TestOpenAiTokenRequest
-          )) as never;
+          return Result.succeed(
+            (await options.background.testOpenAiToken(
+              message as TestOpenAiTokenRequest
+            )) as never
+          );
         }
-        return { ok: true } as never;
+        return Result.succeed({ ok: true } as never);
       }
 
       if (action === "runContextAction") {
         if (options.background?.runContextAction) {
-          return (await options.background.runContextAction(
-            message as RunContextActionRequest
-          )) as never;
+          return Result.succeed(
+            (await options.background.runContextAction(
+              message as RunContextActionRequest
+            )) as never
+          );
         }
-        return {
+        return Result.succeed({
           ok: false,
           error: "storybook runtime: not implemented",
-        } as never;
+        } as never);
       }
 
-      return {} as never;
+      return Result.succeed({} as never);
     },
-    sendMessageToTab: async () => ({ success: true }) as never,
+    sendMessageToTab: async () => Result.succeed({ success: true } as never),
     openUrl: (url) => {
       try {
         const trimmed = url.trim();
