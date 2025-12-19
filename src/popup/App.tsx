@@ -24,6 +24,26 @@ function replaceHash(nextHash: string): void {
   }
 }
 
+function canUseChromeAction(runtime: { isExtensionPage: boolean }): boolean {
+  return (
+    runtime.isExtensionPage &&
+    typeof chrome !== "undefined" &&
+    Boolean((chrome as unknown as { action?: unknown }).action)
+  );
+}
+
+function clearActionBadgeForTab(tabId: number): void {
+  try {
+    chrome.action.setBadgeText({ text: "", tabId });
+    chrome.action.setTitle({
+      title: "My Browser Utils",
+      tabId,
+    });
+  } catch {
+    // no-op
+  }
+}
+
 function coerceCopyTitleLinkFailure(
   value: unknown
 ): Result.Result<CopyTitleLinkFailure, "invalid"> {
@@ -31,13 +51,130 @@ function coerceCopyTitleLinkFailure(
     return Result.fail("invalid");
   }
   const v = value as Record<string, unknown>;
-  if (typeof v.occurredAt !== "number") return Result.fail("invalid");
-  if (typeof v.tabId !== "number") return Result.fail("invalid");
-  if (typeof v.pageTitle !== "string") return Result.fail("invalid");
-  if (typeof v.pageUrl !== "string") return Result.fail("invalid");
-  if (typeof v.text !== "string") return Result.fail("invalid");
-  if (typeof v.error !== "string") return Result.fail("invalid");
+  if (typeof v.occurredAt !== "number") {
+    return Result.fail("invalid");
+  }
+  if (typeof v.tabId !== "number") {
+    return Result.fail("invalid");
+  }
+  if (typeof v.pageTitle !== "string") {
+    return Result.fail("invalid");
+  }
+  if (typeof v.pageUrl !== "string") {
+    return Result.fail("invalid");
+  }
+  if (typeof v.text !== "string") {
+    return Result.fail("invalid");
+  }
+  if (typeof v.error !== "string") {
+    return Result.fail("invalid");
+  }
   return Result.succeed(value as CopyTitleLinkFailure);
+}
+
+async function loadCopyTitleLinkFailure(runtime: {
+  storageLocalGet: (keys: ["lastCopyTitleLinkFailure"]) => Promise<unknown>;
+}): Promise<
+  | { ok: true; value: CopyTitleLinkFailure }
+  | { ok: false; error: "none" | "storage-error" | "invalid" }
+> {
+  const result = await Result.pipe(
+    Result.try({
+      immediate: true,
+      try: () => runtime.storageLocalGet(["lastCopyTitleLinkFailure"]),
+      catch: () => "storage-error" as const,
+    }),
+    Result.map(
+      (data) =>
+        (data as { lastCopyTitleLinkFailure?: unknown })
+          .lastCopyTitleLinkFailure
+    ),
+    Result.andThen((stored) => {
+      if (typeof stored === "undefined") {
+        return Result.fail("none" as const);
+      }
+      return coerceCopyTitleLinkFailure(stored);
+    })
+  );
+
+  if (Result.isFailure(result)) {
+    return { ok: false, error: result.error };
+  }
+
+  return { ok: true, value: result.value };
+}
+
+async function handleCopyTitleLinkFailureOnPopupOpen(params: {
+  runtime: ReturnType<typeof createPopupRuntime>;
+  notify: ReturnType<typeof createNotifications>["notify"];
+  setCreateLinkInitialLink: (value: { title: string; url: string }) => void;
+  setCreateLinkInitialFormat: (value: LinkFormat) => void;
+  navigateToCreateLink: () => void;
+}): Promise<void> {
+  const MAX_AGE_MS = 2 * 60 * 1000;
+
+  const failureLoaded = await loadCopyTitleLinkFailure(params.runtime);
+  if (!failureLoaded.ok) {
+    if (failureLoaded.error === "invalid") {
+      await params.runtime
+        .storageLocalRemove("lastCopyTitleLinkFailure")
+        .catch(() => {
+          // no-op
+        });
+    }
+    return;
+  }
+
+  const failure = failureLoaded.value;
+  const actionAvailable = canUseChromeAction(params.runtime);
+
+  if (Date.now() - failure.occurredAt > MAX_AGE_MS) {
+    await params.runtime
+      .storageLocalRemove("lastCopyTitleLinkFailure")
+      .catch(() => {
+        // no-op
+      });
+    if (actionAvailable) {
+      clearActionBadgeForTab(failure.tabId);
+    }
+    return;
+  }
+
+  const activeTabId = await params.runtime.getActiveTabId().catch(() => null);
+  if (activeTabId === null) {
+    return;
+  }
+  if (activeTabId !== failure.tabId) {
+    return;
+  }
+
+  await params.runtime
+    .storageLocalRemove("lastCopyTitleLinkFailure")
+    .catch(() => {
+      // no-op
+    });
+  if (actionAvailable) {
+    clearActionBadgeForTab(failure.tabId);
+  }
+
+  params.setCreateLinkInitialLink({
+    title: failure.pageTitle,
+    url: failure.pageUrl,
+  });
+  params.setCreateLinkInitialFormat("text");
+  params.navigateToCreateLink();
+
+  params.notify.error(
+    [
+      "このページでは自動コピーできませんでした。",
+      failure.pageTitle ? `タイトル: ${failure.pageTitle}` : null,
+      failure.pageUrl ? `URL: ${failure.pageUrl}` : null,
+      "",
+      "このポップアップ「リンク作成」からコピーできます。",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  );
 }
 
 export function PopupApp(): React.JSX.Element {
@@ -101,98 +238,15 @@ export function PopupApp(): React.JSX.Element {
   }, [menuOpen]);
 
   useEffect(() => {
-    void (async () => {
-      const MAX_AGE_MS = 2 * 60 * 1000;
-      const canUseChromeAction =
-        runtime.isExtensionPage &&
-        typeof chrome !== "undefined" &&
-        Boolean((chrome as unknown as { action?: unknown }).action);
-
-      const failureResult = Result.pipe(
-        Result.try({
-          immediate: true,
-          try: () => runtime.storageLocalGet(["lastCopyTitleLinkFailure"]),
-          catch: () => "storage-error" as const,
-        }),
-        Result.map(
-          (data) =>
-            (data as { lastCopyTitleLinkFailure?: unknown })
-              .lastCopyTitleLinkFailure
-        ),
-        Result.andThen((value) => coerceCopyTitleLinkFailure(value))
-      );
-
-      const failureLoaded = await failureResult;
-      if (Result.isFailure(failureLoaded)) {
-        if (failureLoaded.error === "invalid") {
-          await runtime
-            .storageLocalRemove("lastCopyTitleLinkFailure")
-            .catch(() => {
-              // no-op
-            });
-        }
-        return;
-      }
-
-      const failure = failureLoaded.value;
-      if (Date.now() - failure.occurredAt > MAX_AGE_MS) {
-        await runtime
-          .storageLocalRemove("lastCopyTitleLinkFailure")
-          .catch(() => {
-            // no-op
-          });
-        if (canUseChromeAction) {
-          try {
-            chrome.action.setBadgeText({ text: "", tabId: failure.tabId });
-            chrome.action.setTitle({
-              title: "My Browser Utils",
-              tabId: failure.tabId,
-            });
-          } catch {
-            // no-op
-          }
-        }
-        return;
-      }
-
-      const activeTabId = await runtime.getActiveTabId().catch(() => null);
-      if (activeTabId === null) return;
-      if (activeTabId !== failure.tabId) return;
-
-      await runtime.storageLocalRemove("lastCopyTitleLinkFailure").catch(() => {
-        // no-op
-      });
-      if (canUseChromeAction) {
-        try {
-          chrome.action.setBadgeText({ text: "", tabId: failure.tabId });
-          chrome.action.setTitle({
-            title: "My Browser Utils",
-            tabId: failure.tabId,
-          });
-        } catch {
-          // no-op
-        }
-      }
-
-      setCreateLinkInitialLink({
-        title: failure.pageTitle,
-        url: failure.pageUrl,
-      });
-      setCreateLinkInitialFormat("text");
-      setTabValue("pane-create-link");
-
-      notifications.notify.error(
-        [
-          "このページでは自動コピーできませんでした。",
-          failure.pageTitle ? `タイトル: ${failure.pageTitle}` : null,
-          failure.pageUrl ? `URL: ${failure.pageUrl}` : null,
-          "",
-          "このポップアップ「リンク作成」からコピーできます。",
-        ]
-          .filter(Boolean)
-          .join("\n")
-      );
-    })();
+    handleCopyTitleLinkFailureOnPopupOpen({
+      runtime,
+      notify: notifications.notify,
+      setCreateLinkInitialLink: (value) => setCreateLinkInitialLink(value),
+      setCreateLinkInitialFormat: (value) => setCreateLinkInitialFormat(value),
+      navigateToCreateLink: () => setTabValue("pane-create-link"),
+    }).catch(() => {
+      // no-op
+    });
   }, [notifications.notify, runtime]);
 
   return (

@@ -67,7 +67,9 @@ export function CreateLinkPane(props: CreateLinkPaneProps): React.JSX.Element {
   }, [loadFromActiveTab, props.initialLink]);
 
   useEffect(() => {
-    if (!props.initialFormat) return;
+    if (!props.initialFormat) {
+      return;
+    }
     setFormat(props.initialFormat);
   }, [props.initialFormat]);
 

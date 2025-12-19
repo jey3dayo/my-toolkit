@@ -164,15 +164,6 @@ function buildContextMenuSelectionContext(
   return { selection, initialSource, selectionSecondary, tokenHintSecondary };
 }
 
-function buildTitleLinkCopyText(tab?: chrome.tabs.Tab): string {
-  const title = tab?.title?.trim() ?? "";
-  const url = tab?.url?.trim() ?? "";
-  if (title && url) {
-    return `${title}\n${url}`;
-  }
-  return url || title;
-}
-
 function buildCopyTitleLinkOverlayTitle(): string {
   return "タイトルとリンクをコピー";
 }
