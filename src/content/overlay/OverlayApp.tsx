@@ -37,6 +37,13 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+const OVERLAY_TOAST_GAP_PX = 8;
+const OVERLAY_TOAST_ESTIMATED_HEIGHT_PX = 52;
+const OVERLAY_TOAST_SAFE_MARGIN_PX = 16;
+const OVERLAY_TOAST_SURFACE_INSET_BELOW = `calc(100% + ${OVERLAY_TOAST_GAP_PX}px) 12px auto 12px`;
+const OVERLAY_TOAST_SURFACE_INSET_ABOVE = `auto 12px calc(100% + ${OVERLAY_TOAST_GAP_PX}px) 12px`;
+const OVERLAY_TOAST_SURFACE_INSET_INSIDE = "auto 12px 12px 12px";
+
 // Regex patterns at module level for performance (lint/performance/useTopLevelRegex)
 const SELECTION_SECONDARY_REGEX = /^選択範囲:\s*\n([\s\S]*)$/;
 
@@ -130,6 +137,49 @@ type PanelSize = { width: number; height: number };
 function getPanelSize(panel: HTMLDivElement | null): PanelSize {
   const rect = panel?.getBoundingClientRect();
   return { width: rect?.width || 520, height: rect?.height || 300 };
+}
+
+function updateOverlayToastSurfaceInset(params: {
+  host: HTMLDivElement;
+  panel: HTMLDivElement | null;
+}): void {
+  const panel = params.panel;
+  const host = params.host;
+  if (!panel) {
+    host.style.setProperty(
+      "--toast-surface-inset",
+      OVERLAY_TOAST_SURFACE_INSET_BELOW
+    );
+    return;
+  }
+
+  const panelRect = panel.getBoundingClientRect();
+  const required =
+    OVERLAY_TOAST_GAP_PX +
+    OVERLAY_TOAST_ESTIMATED_HEIGHT_PX +
+    OVERLAY_TOAST_SAFE_MARGIN_PX;
+  const spaceAbove = panelRect.top;
+  const spaceBelow = window.innerHeight - panelRect.bottom;
+
+  if (spaceBelow >= required) {
+    host.style.setProperty(
+      "--toast-surface-inset",
+      OVERLAY_TOAST_SURFACE_INSET_BELOW
+    );
+    return;
+  }
+  if (spaceAbove >= required) {
+    host.style.setProperty(
+      "--toast-surface-inset",
+      OVERLAY_TOAST_SURFACE_INSET_ABOVE
+    );
+    return;
+  }
+
+  host.style.setProperty(
+    "--toast-surface-inset",
+    OVERLAY_TOAST_SURFACE_INSET_INSIDE
+  );
 }
 
 function updateHostPosition(
@@ -525,6 +575,10 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
       pinned,
       pinnedPos,
       anchorRect: viewModel.anchorRect,
+    });
+    updateOverlayToastSurfaceInset({
+      host: props.host,
+      panel: panelRef.current,
     });
   }, [props.host, viewModel.open, viewModel.anchorRect, pinned, pinnedPos]);
 

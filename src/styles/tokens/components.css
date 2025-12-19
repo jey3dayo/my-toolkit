@@ -117,7 +117,7 @@
 :host(#my-browser-utils-overlay) {
   top: 16px;
   left: 16px;
-  --toast-surface-inset: auto 12px 12px 12px;
+  --toast-surface-inset: calc(100% + 8px) 12px auto 12px;
 }
 
 :host,

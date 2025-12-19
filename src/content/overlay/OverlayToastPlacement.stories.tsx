@@ -114,7 +114,13 @@ export const Basic: Story = {
       throw new Error("Toast not found");
     }
 
+    const panel = shadow.querySelector<HTMLElement>(".mbu-overlay-panel");
+    if (!panel) {
+      throw new Error("Panel not found");
+    }
+
     const rect = toast.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
     const view = doc.defaultView;
     const viewportWidth = view?.innerWidth ?? doc.documentElement.clientWidth;
     const viewportHeight =
@@ -124,5 +130,6 @@ export const Basic: Story = {
     expect(rect.top).toBeGreaterThanOrEqual(-1);
     expect(rect.right).toBeLessThanOrEqual(viewportWidth + 1);
     expect(rect.bottom).toBeLessThanOrEqual(viewportHeight + 1);
+    expect(rect.top).toBeGreaterThanOrEqual(panelRect.bottom + 7);
   },
 };
