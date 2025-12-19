@@ -1,7 +1,23 @@
 import type { Preview } from "@storybook/react-vite";
 import { ensurePopupUiBaseStyles } from "@/ui/styles";
+import { applyTheme, isTheme } from "@/ui/theme";
 
 const preview: Preview = {
+  globalTypes: {
+    theme: {
+      description: "UI theme",
+      defaultValue: "auto",
+      toolbar: {
+        icon: "circlehollow",
+        items: [
+          { value: "auto", title: "Auto" },
+          { value: "dark", title: "Dark" },
+          { value: "light", title: "Light" },
+        ],
+        dynamicTitle: true,
+      },
+    },
+  },
   parameters: {
     controls: {
       matchers: {
@@ -17,9 +33,11 @@ const preview: Preview = {
     },
   },
   decorators: [
-    (Story) => {
+    (Story, context) => {
       ensurePopupUiBaseStyles(document);
       document.body.classList.add("is-extension");
+      const theme = context.globals.theme;
+      applyTheme(isTheme(theme) ? theme : "auto", document);
       return (
         <div
           className="mbu-surface"
