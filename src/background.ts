@@ -29,12 +29,25 @@ type SummaryTarget = {
 type ContentScriptMessage =
   | { action: "showNotification"; message: string }
   | { action: "getSummaryTargetText"; ignoreSelection?: boolean }
+  | { action: "copyToClipboard"; text: string; successMessage?: string }
   | {
       action: "showSummaryOverlay";
       status: "loading" | "ready" | "error";
       source: SummarySource;
       summary?: string;
       error?: string;
+    }
+  | {
+      action: "showActionOverlay";
+      status: "loading" | "ready" | "error";
+      mode: "text" | "event";
+      source: SummarySource;
+      title: string;
+      primary?: string;
+      secondary?: string;
+      calendarUrl?: string;
+      ics?: string;
+      event?: ExtractedEvent;
     };
 
 type BackgroundRequest =
@@ -63,6 +76,8 @@ type SyncStorageData = {
 
 const CONTEXT_MENU_ROOT_ID = "mbu-root";
 const CONTEXT_MENU_ACTION_PREFIX = "mbu-action:";
+const CONTEXT_MENU_COPY_TITLE_LINK_ID = "mbu-copy-title-link";
+const CONTEXT_MENU_BUILTIN_SEPARATOR_ID = "mbu-separator:builtins";
 
 // Regex patterns at module level for performance (lint/performance/useTopLevelRegex)
 const WAVE_SEPARATOR_REGEX = /^(.*?)\s*(?:〜|~|–|—)\s*(.*?)$/;
@@ -224,7 +239,6 @@ async function handlePromptAction(context: OverlayContext): Promise<void> {
 chrome.contextMenus.onClicked.addListener(
   (info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.Tab) => {
     if (typeof info.menuItemId !== "string") return;
-    if (!info.menuItemId.startsWith(CONTEXT_MENU_ACTION_PREFIX)) return;
 
     const tabId = tab?.id;
     if (tabId === undefined) {
@@ -232,6 +246,68 @@ chrome.contextMenus.onClicked.addListener(
     }
 
     const menuItemId = info.menuItemId;
+
+    if (menuItemId === CONTEXT_MENU_COPY_TITLE_LINK_ID) {
+      (async () => {
+        const title = tab?.title?.trim() ?? "";
+        const url = tab?.url?.trim() ?? "";
+        const text = title && url ? `${title}\n${url}` : url || title;
+
+        if (!text.trim()) {
+          await sendMessageToTab(tabId, {
+            action: "showNotification",
+            message: "コピーする内容がありません",
+          } satisfies ContentScriptMessage).catch(() => {
+            // no-op
+          });
+          return;
+        }
+
+        try {
+          const result: { ok: true } | { ok: false; error: string } =
+            await sendMessageToTab(tabId, {
+              action: "copyToClipboard",
+              text,
+              successMessage: "コピーしました",
+            } satisfies ContentScriptMessage);
+
+          if (result.ok) {
+            return;
+          }
+
+          await sendMessageToTab(tabId, {
+            action: "showActionOverlay",
+            status: "ready",
+            mode: "text",
+            source: "page",
+            title: "タイトルとリンクをコピー",
+            primary: text,
+            secondary: [
+              "自動コピーに失敗しました。上のボタンでコピーしてください。",
+              "",
+              result.error,
+            ].join("\n"),
+          } satisfies ContentScriptMessage);
+        } catch (error) {
+          console.error("copy title/link failed:", error);
+          await sendMessageToTab(tabId, {
+            action: "showActionOverlay",
+            status: "ready",
+            mode: "text",
+            source: "page",
+            title: "タイトルとリンクをコピー",
+            primary: text,
+            secondary:
+              error instanceof Error ? error.message : "コピーに失敗しました",
+          } satisfies ContentScriptMessage).catch(() => {
+            // no-op
+          });
+        }
+      })();
+      return;
+    }
+
+    if (!menuItemId.startsWith(CONTEXT_MENU_ACTION_PREFIX)) return;
 
     (async () => {
       const selection = info.selectionText?.trim() ?? "";
@@ -330,6 +406,44 @@ async function refreshContextMenus(): Promise<void> {
         {
           id: CONTEXT_MENU_ROOT_ID,
           title: "My Browser Utils",
+          contexts: ["page", "selection"],
+        },
+        () => {
+          const err = chrome.runtime.lastError;
+          if (err) {
+            reject(new Error(err.message));
+            return;
+          }
+          resolve();
+        }
+      );
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      chrome.contextMenus.create(
+        {
+          id: CONTEXT_MENU_COPY_TITLE_LINK_ID,
+          parentId: CONTEXT_MENU_ROOT_ID,
+          title: "タイトルとリンクをコピー",
+          contexts: ["page", "selection"],
+        },
+        () => {
+          const err = chrome.runtime.lastError;
+          if (err) {
+            reject(new Error(err.message));
+            return;
+          }
+          resolve();
+        }
+      );
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      chrome.contextMenus.create(
+        {
+          id: CONTEXT_MENU_BUILTIN_SEPARATOR_ID,
+          parentId: CONTEXT_MENU_ROOT_ID,
+          type: "separator",
           contexts: ["page", "selection"],
         },
         () => {

@@ -1,5 +1,5 @@
 import { Toast } from "@base-ui/react/toast";
-import { useMemo } from "react";
+import { cloneElement, useMemo } from "react";
 
 export type Notifier = {
   info: (message: string) => void;
@@ -75,12 +75,8 @@ function ToastList(): React.JSX.Element {
 
   const rendered = useMemo(
     () =>
-      toasts.map((toast) => (
-        <Toast.Positioner
-          className="mbu-toast-positioner"
-          key={toast.id}
-          toast={toast}
-        >
+      toasts.map((toast) => {
+        const content = (
           <Toast.Root className="mbu-toast-root" toast={toast}>
             <Toast.Content className="mbu-toast-content">
               <div>
@@ -100,8 +96,23 @@ function ToastList(): React.JSX.Element {
               </Toast.Close>
             </Toast.Content>
           </Toast.Root>
-        </Toast.Positioner>
-      )),
+        );
+
+        if (toast.positionerProps?.anchor) {
+          return (
+            <Toast.Positioner
+              {...toast.positionerProps}
+              className="mbu-toast-positioner"
+              key={toast.id}
+              toast={toast}
+            >
+              {content}
+            </Toast.Positioner>
+          );
+        }
+
+        return cloneElement(content, { key: toast.id });
+      }),
     [toasts]
   );
 
