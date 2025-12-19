@@ -1,11 +1,14 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
-import { playwright } from '@vitest/browser-playwright';
-import { defineConfig } from 'vitest/config';
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
+import { playwright } from "@vitest/browser-playwright";
+import { defineConfig } from "vitest/config";
 
-const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
-const alias = { '@': path.join(dirname, 'src') };
+const dirname =
+  typeof __dirname !== "undefined"
+    ? __dirname
+    : path.dirname(fileURLToPath(import.meta.url));
+const alias = { "@": path.join(dirname, "src") };
 
 export default defineConfig({
   resolve: {
@@ -18,9 +21,9 @@ export default defineConfig({
           alias,
         },
         test: {
-          name: 'unit',
-          environment: 'jsdom',
-          include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+          name: "unit",
+          environment: "jsdom",
+          include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
           clearMocks: true,
         },
       },
@@ -30,19 +33,19 @@ export default defineConfig({
         },
         plugins: [
           storybookTest({
-            configDir: path.join(dirname, '.storybook'),
-            storybookScript: 'pnpm storybook --no-open --port 6006',
+            configDir: path.join(dirname, ".storybook"),
+            storybookScript: "pnpm storybook --no-open --port 6006",
           }),
         ],
         test: {
-          name: 'storybook',
+          name: "storybook",
           browser: {
             enabled: true,
             provider: playwright({}),
             headless: true,
-            instances: [{ browser: 'chromium' }],
+            instances: [{ browser: "chromium" }],
           },
-          setupFiles: ['.storybook/vitest.setup.ts'],
+          setupFiles: [".storybook/vitest.setup.ts"],
         },
       },
     ],
