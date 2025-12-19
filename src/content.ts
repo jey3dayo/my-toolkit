@@ -25,6 +25,7 @@ import {
   type ContentRequest =
     | { action: "enableTableSort" }
     | { action: "showNotification"; message: string }
+    | { action: "copyToClipboard"; text: string; successMessage?: string }
     | { action: "getSummaryTargetText"; ignoreSelection?: boolean }
     | {
         action: "showSummaryOverlay";
@@ -361,6 +362,29 @@ import {
     mount.notify.info(text);
   }
 
+  async function copyToClipboard(
+    text: string
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return { ok: false, error: "コピーする内容がありません" };
+    }
+
+    if (!navigator.clipboard?.writeText) {
+      return {
+        ok: false,
+        error: "この環境ではクリップボードにコピーできません",
+      };
+    }
+
+    try {
+      await navigator.clipboard.writeText(trimmed);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "コピーに失敗しました" };
+    }
+  }
+
   async function getSummaryTargetText(options?: {
     ignoreSelection?: boolean;
   }): Promise<SummaryTarget> {
@@ -694,6 +718,17 @@ import {
           showNotification(request.message);
           sendResponse({ ok: true });
           return;
+        }
+        case "copyToClipboard": {
+          void (async () => {
+            const result = await copyToClipboard(request.text);
+            if (result.ok && request.successMessage?.trim()) {
+              const mount = ensureToastMount();
+              mount.notify.success(request.successMessage.trim());
+            }
+            sendResponse(result);
+          })();
+          return true;
         }
         case "getSummaryTargetText": {
           void (async () => {
