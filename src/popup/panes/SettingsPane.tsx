@@ -187,17 +187,6 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
     props.notify.error("保存に失敗しました");
   };
 
-  const resetTheme = async (): Promise<void> => {
-    const removed = await props.runtime.storageLocalRemove("theme");
-    if (Result.isSuccess(removed)) {
-      setTheme("auto");
-      applyTheme("auto", document);
-      props.notify.success("デフォルトに戻しました");
-      return;
-    }
-    props.notify.error("変更に失敗しました");
-  };
-
   return (
     <div className="card card-stack">
       <div className="stack-sm">
@@ -435,17 +424,6 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
             type="button"
           >
             保存
-          </Button>
-          <Button
-            className="btn btn-ghost btn-small"
-            onClick={() => {
-              resetTheme().catch(() => {
-                // no-op
-              });
-            }}
-            type="button"
-          >
-            デフォルトに戻す
           </Button>
         </div>
       </Form>
