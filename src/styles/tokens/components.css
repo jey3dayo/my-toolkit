@@ -10,14 +10,9 @@
   --button-radius-sm: var(--radius-sm);
   --button-font-weight: 700;
 
-  --button-bg-primary: linear-gradient(
-    135deg,
-    var(--color-primary),
-    var(--color-primary-2)
-  );
+  --button-bg-primary: linear-gradient(135deg, var(--color-primary), var(--color-primary-2));
   --button-text-primary: var(--color-bg);
-  --button-shadow-primary: 0 10px 30px
-    color-mix(in oklab, var(--color-primary) 25%, transparent);
+  --button-shadow-primary: 0 10px 30px color-mix(in oklab, var(--color-primary) 25%, transparent);
 
   --button-bg-ghost: color-mix(in oklab, var(--color-text) 4%, transparent);
   --button-text-ghost: var(--color-text);
@@ -29,11 +24,7 @@
   --input-border: 1px solid var(--color-border);
   --input-bg: var(--color-surface-2);
   --input-text: var(--color-text);
-  --input-placeholder: color-mix(
-    in oklab,
-    var(--color-text-muted) 70%,
-    transparent
-  );
+  --input-placeholder: color-mix(in oklab, var(--color-text-muted) 70%, transparent);
 
   /* Cards */
   --card-bg: var(--color-surface);
@@ -53,14 +44,9 @@
   --button-radius-sm: var(--radius-sm);
   --button-font-weight: 700;
 
-  --button-bg-primary: linear-gradient(
-    135deg,
-    var(--color-primary),
-    var(--color-primary-2)
-  );
+  --button-bg-primary: linear-gradient(135deg, var(--color-primary), var(--color-primary-2));
   --button-text-primary: var(--color-bg);
-  --button-shadow-primary: 0 10px 30px
-    color-mix(in oklab, var(--color-primary) 25%, transparent);
+  --button-shadow-primary: 0 10px 30px color-mix(in oklab, var(--color-primary) 25%, transparent);
 
   --button-bg-ghost: color-mix(in oklab, var(--color-text) 4%, transparent);
   --button-text-ghost: var(--color-text);
@@ -71,11 +57,7 @@
   --input-border: 1px solid var(--color-border);
   --input-bg: var(--color-surface-2);
   --input-text: var(--color-text);
-  --input-placeholder: color-mix(
-    in oklab,
-    var(--color-text-muted) 70%,
-    transparent
-  );
+  --input-placeholder: color-mix(in oklab, var(--color-text-muted) 70%, transparent);
 
   --card-bg: var(--color-surface);
   --card-border: 1px solid var(--color-border);
@@ -132,15 +114,7 @@
  * Shared component styles (Base UI / headless)
  * ====================================== */
 
-:where(
-    a,
-    button,
-    input,
-    textarea,
-    select,
-    [role="button"],
-    [tabindex]
-  ):focus-visible {
+:where(a, button, input, textarea, select, [role="button"], [tabindex]):focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
 }
@@ -187,19 +161,11 @@
 }
 
 .mbu-toast-root[data-type="success"] {
-  border-color: color-mix(
-    in oklab,
-    var(--color-primary) 55%,
-    var(--color-border-ui)
-  );
+  border-color: color-mix(in oklab, var(--color-primary) 55%, var(--color-border-ui));
 }
 
 .mbu-toast-root[data-type="error"] {
-  border-color: color-mix(
-    in oklab,
-    var(--color-danger) 55%,
-    var(--color-border-ui)
-  );
+  border-color: color-mix(in oklab, var(--color-danger) 55%, var(--color-border-ui));
 }
 
 .mbu-toast-content {
@@ -482,8 +448,7 @@
   margin: 0;
   padding: 10px 12px;
   border: 1px solid var(--mbu-border);
-  border-left: 4px solid
-    color-mix(in oklab, var(--mbu-accent) 60%, var(--mbu-border));
+  border-left: 4px solid color-mix(in oklab, var(--mbu-accent) 60%, var(--mbu-border));
   border-radius: 12px;
   background: color-mix(in oklab, var(--mbu-surface) 84%, transparent);
   color: var(--mbu-text-muted);
@@ -531,8 +496,7 @@
 .mbu-overlay-aux .mbu-overlay-quote {
   border: none;
   border-top: 1px solid var(--mbu-border);
-  border-left: 4px solid
-    color-mix(in oklab, var(--mbu-accent) 60%, var(--mbu-border));
+  border-left: 4px solid color-mix(in oklab, var(--mbu-accent) 60%, var(--mbu-border));
   border-radius: 0 0 12px 12px;
   background: transparent;
 }
@@ -667,9 +631,7 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
 }
 
 .hint code {
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 12px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -767,11 +729,7 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
 }
 
 .card.secondary {
-  background: linear-gradient(
-    140deg,
-    rgba(62, 207, 142, 0.07),
-    rgba(19, 27, 43, 0.98)
-  );
+  background: linear-gradient(140deg, rgba(62, 207, 142, 0.07), rgba(19, 27, 43, 0.98));
 }
 
 .card-header {

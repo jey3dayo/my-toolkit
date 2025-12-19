@@ -21,16 +21,9 @@ body {
   font-size: var(--primitive-font-size-14);
   color: var(--color-text);
   background:
-    radial-gradient(
-      circle at 20% 20%,
-      color-mix(in oklab, var(--color-primary) 8%, transparent),
-      transparent 30%
-    ),
-    radial-gradient(
-      circle at 80% 0%,
-      color-mix(in oklab, var(--color-primary-2) 8%, transparent),
-      transparent 28%
-    ), var(--color-bg);
+    radial-gradient(circle at 20% 20%, color-mix(in oklab, var(--color-primary) 8%, transparent), transparent 30%),
+    radial-gradient(circle at 80% 0%, color-mix(in oklab, var(--color-primary-2) 8%, transparent), transparent 28%),
+    var(--color-bg);
 }
 
 body.is-extension {
