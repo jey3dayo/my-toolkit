@@ -22,6 +22,7 @@ import type {
 } from "@/popup/runtime";
 import type { LocalStorageData } from "@/storage/types";
 import { applyTheme, isTheme, type Theme } from "@/ui/theme";
+import { isRecord } from "@/utils/guards";
 
 export type SettingsPaneProps = PopupPaneBaseProps & {
   tokenInputRef: React.RefObject<HTMLInputElement | null>;
@@ -30,7 +31,7 @@ export type SettingsPaneProps = PopupPaneBaseProps & {
 function isTestOpenAiTokenResponse(
   value: unknown
 ): value is TestOpenAiTokenResponse {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return false;
   }
   const v = value as { ok?: unknown };
