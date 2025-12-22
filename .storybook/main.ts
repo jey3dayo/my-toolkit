@@ -65,6 +65,9 @@ const config: StorybookConfig = {
     viteConfig.optimizeDeps.include = Array.from(
       new Set([
         ...include,
+        "react",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
         "date-fns",
         "react-dom",
         "react-dom/client",
