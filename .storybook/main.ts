@@ -1,12 +1,28 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { StorybookConfig } from "@storybook/react-vite";
+import type { Plugin } from "vite";
 
 const dirname =
   typeof __dirname !== "undefined"
     ? __dirname
     : path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(dirname, "../src");
+const tomlAsText = (): Plugin => ({
+  name: "toml-as-text",
+  enforce: "pre",
+  load(id: string) {
+    if (!id.endsWith(".toml")) {
+      return null;
+    }
+    const code = fs.readFileSync(id, "utf8");
+    return {
+      code: `export default ${JSON.stringify(code)};`,
+      map: null,
+    };
+  },
+});
 const config: StorybookConfig = {
   stories: ["../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
   addons: [
@@ -21,6 +37,9 @@ const config: StorybookConfig = {
     { from: "../images", to: "/images" },
   ],
   viteFinal(viteConfig) {
+    const plugins = Array.isArray(viteConfig.plugins) ? viteConfig.plugins : [];
+    viteConfig.plugins = [tomlAsText(), ...plugins];
+
     viteConfig.resolve ??= {};
     const alias = viteConfig.resolve.alias;
     if (Array.isArray(alias)) {
