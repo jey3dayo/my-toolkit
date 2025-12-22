@@ -75,10 +75,23 @@ export function createPopupChromeStub(): PopupChromeStub {
       ),
       sendMessage: vi.fn((...args: unknown[]) => {
         clearError();
-        const last = args.at(-1);
-        if (typeof last === "function") {
-          (last as (resp: unknown) => void)({ ok: true });
+        const callback = args.find((item) => typeof item === "function") as
+          | ((resp: unknown) => void)
+          | undefined;
+        if (!callback) {
+          return;
         }
+        const message = args[1] as { action?: unknown } | undefined;
+        if (message?.action === "getSummaryTargetText") {
+          callback({
+            text: "stub selection",
+            source: "selection",
+            title: "stub title",
+            url: "https://example.com",
+          });
+          return;
+        }
+        callback({ ok: true });
       }),
       create: vi.fn((_createProperties: unknown, callback?: () => void) => {
         clearError();

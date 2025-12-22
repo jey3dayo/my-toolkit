@@ -934,6 +934,69 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
   gap: 10px;
 }
 
+.mbu-accordion {
+  display: grid;
+  gap: 8px;
+}
+
+.mbu-accordion-item {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.mbu-accordion-header {
+  margin: 0;
+}
+
+.mbu-accordion-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.mbu-accordion-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mbu-accordion-icon {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.mbu-accordion-trigger[aria-expanded="true"] .mbu-accordion-icon {
+  transform: rotate(180deg);
+}
+
+.mbu-accordion-panel {
+  padding: 0 12px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.mbu-accordion-meta,
+.mbu-accordion-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-sub);
+  line-height: 1.4;
+}
+
+.mbu-accordion-text {
+  min-height: 96px;
+}
+
 .editor-panel {
   margin-top: 18px;
   padding-top: 14px;

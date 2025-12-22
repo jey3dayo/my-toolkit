@@ -10,10 +10,12 @@ import type { PaneId } from "@/popup/panes";
 import { ActionButtons } from "@/popup/panes/actions/ActionButtons";
 import { ActionEditorPanel } from "@/popup/panes/actions/ActionEditorPanel";
 import { ActionOutputPanel } from "@/popup/panes/actions/ActionOutputPanel";
+import { ActionTargetAccordion } from "@/popup/panes/actions/ActionTargetAccordion";
 import type {
   PopupRuntime,
   RunContextActionRequest,
   RunContextActionResponse,
+  SummaryTarget,
 } from "@/popup/runtime";
 import { ensureOpenAiTokenConfigured } from "@/popup/token_guard";
 import { coerceSummarySourceLabel } from "@/popup/utils/summary_source_label";
@@ -46,6 +48,20 @@ function isRunContextActionResponse(
   }
   const v = value as { ok?: unknown };
   if (typeof v.ok !== "boolean") {
+    return false;
+  }
+  return true;
+}
+
+function isSummaryTarget(value: unknown): value is SummaryTarget {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const v = value as { text?: unknown; source?: unknown };
+  if (typeof v.text !== "string") {
+    return false;
+  }
+  if (v.source !== "selection" && v.source !== "page") {
     return false;
   }
   return true;
@@ -123,6 +139,7 @@ function parseRunContextActionResponseToOutput(params: {
 export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
   const [actions, setActions] = useState<ContextAction[]>([]);
   const [output, setOutput] = useState<OutputState>({ status: "idle" });
+  const [target, setTarget] = useState<SummaryTarget | null>(null);
   const [editorId, setEditorId] = useState<string>("");
   const [editorTitle, setEditorTitle] = useState("");
   const [editorKind, setEditorKind] = useState<ContextActionKind>("text");
@@ -138,6 +155,9 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
       : "出力";
   const outputText = output.status === "ready" ? output.text : "";
   const canCopyOutput = Boolean(outputText.trim());
+  const targetSourceLabel = target
+    ? coerceSummarySourceLabel(target.source)
+    : "";
   const outputValue = (() => {
     switch (output.status) {
       case "ready":
@@ -320,6 +340,31 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
     return !Result.isFailure(tokenConfigured);
   };
 
+  const reportError = (message: string): void => {
+    props.notify.error(message);
+    setOutput({ status: "idle" });
+  };
+
+  const fetchSummaryTarget = async (
+    tabId: number
+  ): Promise<SummaryTarget | null> => {
+    const targetResult = await props.runtime.sendMessageToTab<
+      { action: "getSummaryTargetText" },
+      SummaryTarget
+    >(tabId, { action: "getSummaryTargetText" });
+    if (Result.isFailure(targetResult)) {
+      reportError(targetResult.error);
+      return null;
+    }
+
+    if (!isSummaryTarget(targetResult.value)) {
+      reportError("対象テキストの取得に失敗しました");
+      return null;
+    }
+
+    return targetResult.value;
+  };
+
   const runAction = async (actionId: string): Promise<void> => {
     const action = actionsById.get(actionId);
     if (!action) {
@@ -335,19 +380,24 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
     }
 
     setOutput({ status: "running", title: action.title });
+    setTarget(null);
 
     const tabIdResult = await props.runtime.getActiveTabId();
     if (Result.isFailure(tabIdResult)) {
-      props.notify.error(tabIdResult.error);
-      setOutput({ status: "idle" });
+      reportError(tabIdResult.error);
       return;
     }
     const tabId = tabIdResult.value;
     if (tabId === null) {
-      props.notify.error("有効なタブが見つかりません");
-      setOutput({ status: "idle" });
+      reportError("有効なタブが見つかりません");
       return;
     }
+
+    const summaryTarget = await fetchSummaryTarget(tabId);
+    if (!summaryTarget) {
+      return;
+    }
+    setTarget(summaryTarget);
 
     const responseUnknown = await props.runtime.sendMessageToBackground<
       RunContextActionRequest,
@@ -356,10 +406,10 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
       action: "runContextAction",
       tabId,
       actionId,
+      target: summaryTarget,
     });
     if (Result.isFailure(responseUnknown)) {
-      props.notify.error(responseUnknown.error);
-      setOutput({ status: "idle" });
+      reportError(responseUnknown.error);
       return;
     }
 
@@ -368,8 +418,7 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
       responseUnknown: responseUnknown.value,
     });
     if (!parsed.ok) {
-      props.notify.error(parsed.error);
-      setOutput({ status: "idle" });
+      reportError(parsed.error);
       return;
     }
 
@@ -420,6 +469,13 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
           });
         }}
       />
+
+      {target ? (
+        <ActionTargetAccordion
+          sourceLabel={targetSourceLabel}
+          target={target}
+        />
+      ) : null}
 
       <ActionOutputPanel
         canCopy={canCopyOutput}

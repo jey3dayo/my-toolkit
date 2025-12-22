@@ -66,7 +66,12 @@ type ContentScriptMessage =
 
 type BackgroundRequest =
   | { action: "summarizeTab"; tabId: number }
-  | { action: "runContextAction"; tabId: number; actionId: string };
+  | {
+      action: "runContextAction";
+      tabId: number;
+      actionId: string;
+      target?: SummaryTarget;
+    };
 
 type BackgroundResponse =
   | { ok: true; summary: string; source: SummarySource }
@@ -904,12 +909,14 @@ chrome.runtime.onMessage.addListener(
     if (request.action === "runContextAction") {
       (async () => {
         try {
-          const target = await sendMessageToTab<
-            ContentScriptMessage,
-            SummaryTarget
-          >(request.tabId, {
-            action: "getSummaryTargetText",
-          });
+          const target =
+            request.target ??
+            (await sendMessageToTab<ContentScriptMessage, SummaryTarget>(
+              request.tabId,
+              {
+                action: "getSummaryTargetText",
+              }
+            ));
 
           const actions = await loadContextActions();
           const action = actions.find((item) => item.id === request.actionId);

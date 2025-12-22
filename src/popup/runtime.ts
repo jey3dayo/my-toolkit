@@ -24,6 +24,7 @@ export type RunContextActionRequest = {
   action: "runContextAction";
   tabId: number;
   actionId: string;
+  target?: SummaryTarget;
 };
 export type RunContextActionResponse =
   | { ok: true; resultType: "text"; text: string; source: SummarySource }
