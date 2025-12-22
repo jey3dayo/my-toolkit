@@ -19,6 +19,7 @@ import type {
 } from "@/popup/runtime";
 import { ensureOpenAiTokenConfigured } from "@/popup/token_guard";
 import { coerceSummarySourceLabel } from "@/popup/utils/summary_source_label";
+import { fetchSummaryTargetForTab } from "@/popup/utils/summary_target";
 import type { Notifier } from "@/ui/toast";
 import { isRecord } from "@/utils/guards";
 
@@ -48,20 +49,6 @@ function isRunContextActionResponse(
   }
   const v = value as { ok?: unknown };
   if (typeof v.ok !== "boolean") {
-    return false;
-  }
-  return true;
-}
-
-function isSummaryTarget(value: unknown): value is SummaryTarget {
-  if (!isRecord(value)) {
-    return false;
-  }
-  const v = value as { text?: unknown; source?: unknown };
-  if (typeof v.text !== "string") {
-    return false;
-  }
-  if (v.source !== "selection" && v.source !== "page") {
     return false;
   }
   return true;
@@ -278,47 +265,52 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
     props.notify.error("保存に失敗しました");
   };
 
-  const deleteEditor = async (): Promise<void> => {
-    if (!editorId) {
-      return;
-    }
-
-    const previous = actions;
-    const nextActions = actions.filter((action) => action.id !== editorId);
-    setActions(nextActions);
+  const resetEditorState = (): void => {
     setEditorId("");
     setEditorTitle("");
     setEditorKind("text");
     setEditorPrompt("");
+  };
+
+  const persistActionsUpdate = async (
+    nextActions: ContextAction[],
+    successMessage: string,
+    failureMessage: string
+  ): Promise<void> => {
+    const previous = actions;
+    setActions(nextActions);
+    resetEditorState();
 
     const saved = await props.runtime.storageSyncSet({
       contextActions: nextActions,
     });
     if (Result.isSuccess(saved)) {
-      props.notify.success("削除しました");
+      props.notify.success(successMessage);
       return;
     }
     setActions(previous);
-    props.notify.error("削除に失敗しました");
+    props.notify.error(failureMessage);
+  };
+
+  const deleteEditor = async (): Promise<void> => {
+    if (!editorId) {
+      return;
+    }
+
+    const nextActions = actions.filter((action) => action.id !== editorId);
+    await persistActionsUpdate(
+      nextActions,
+      "削除しました",
+      "削除に失敗しました"
+    );
   };
 
   const resetActions = async (): Promise<void> => {
-    const previous = actions;
-    setActions(DEFAULT_CONTEXT_ACTIONS);
-    setEditorId("");
-    setEditorTitle("");
-    setEditorKind("text");
-    setEditorPrompt("");
-
-    const saved = await props.runtime.storageSyncSet({
-      contextActions: DEFAULT_CONTEXT_ACTIONS,
-    });
-    if (Result.isSuccess(saved)) {
-      props.notify.success("リセットしました");
-      return;
-    }
-    setActions(previous);
-    props.notify.error("リセットに失敗しました");
+    await persistActionsUpdate(
+      DEFAULT_CONTEXT_ACTIONS,
+      "リセットしました",
+      "リセットに失敗しました"
+    );
   };
 
   const ensureTokenReady = async (): Promise<boolean> => {
@@ -343,26 +335,6 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
   const reportError = (message: string): void => {
     props.notify.error(message);
     setOutput({ status: "idle" });
-  };
-
-  const fetchSummaryTarget = async (
-    tabId: number
-  ): Promise<SummaryTarget | null> => {
-    const targetResult = await props.runtime.sendMessageToTab<
-      { action: "getSummaryTargetText" },
-      SummaryTarget
-    >(tabId, { action: "getSummaryTargetText" });
-    if (Result.isFailure(targetResult)) {
-      reportError(targetResult.error);
-      return null;
-    }
-
-    if (!isSummaryTarget(targetResult.value)) {
-      reportError("対象テキストの取得に失敗しました");
-      return null;
-    }
-
-    return targetResult.value;
   };
 
   const runAction = async (actionId: string): Promise<void> => {
@@ -393,7 +365,11 @@ export function ActionsPane(props: ActionsPaneProps): React.JSX.Element {
       return;
     }
 
-    const summaryTarget = await fetchSummaryTarget(tabId);
+    const summaryTarget = await fetchSummaryTargetForTab({
+      runtime: props.runtime,
+      tabId,
+      onError: reportError,
+    });
     if (!summaryTarget) {
       return;
     }
