@@ -218,7 +218,11 @@
   border-radius: 999px;
   background: var(--toast-accent);
   box-shadow: 0 0 0 3px
-    color-mix(in oklab, var(--toast-accent) 18%, transparent);
+    color-mix(
+      in oklab,
+      var(--toast-accent) var(--accent-mix-18),
+      transparent
+    );
   flex: 0 0 auto;
 }
 
@@ -618,11 +622,19 @@
 .chip-outline {
   border: 1px solid color-mix(in oklab, var(--color-primary) 60%, transparent);
   color: var(--color-primary);
-  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-primary) var(--accent-mix-8),
+    transparent
+  );
 }
 
 .chip-soft {
-  background: color-mix(in oklab, var(--color-primary-2) 15%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-primary-2) var(--accent-mix-15),
+    transparent
+  );
   color: color-mix(in oklab, var(--color-primary-2) 65%, var(--color-text));
 }
 
@@ -840,7 +852,11 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
 .mbu-radio-root[data-checked],
 .mbu-radio-root[aria-checked="true"] {
   border-color: color-mix(in oklab, var(--color-primary) 35%, var(--line));
-  background: color-mix(in oklab, var(--color-primary) 14%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-primary) var(--accent-mix-14),
+    transparent
+  );
 }
 
 .mbu-radio-root[data-checked] .mbu-radio-indicator,
@@ -1048,7 +1064,11 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
 }
 
 .mbu-select-item[data-selected] {
-  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-primary) var(--accent-mix-12),
+    transparent
+  );
 }
 
 .mbu-select-indicator {
@@ -1091,7 +1111,11 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
 .mbu-toggle[data-pressed] {
   color: var(--text);
   border-color: color-mix(in oklab, var(--color-primary) 35%, var(--line));
-  background: color-mix(in oklab, var(--color-primary) 14%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-primary) var(--accent-mix-14),
+    transparent
+  );
 }
 
 .mbu-toggle-inline {
@@ -1127,7 +1151,11 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
 }
 
 .mbu-toggle-group-item[data-pressed] {
-  background: color-mix(in oklab, var(--color-primary) 14%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-primary) var(--accent-mix-14),
+    transparent
+  );
   color: var(--text);
 }
 
@@ -1200,7 +1228,11 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
 
 .btn-delete {
   border: none;
-  background: color-mix(in oklab, var(--color-danger) 14%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-danger) var(--accent-mix-14),
+    transparent
+  );
   color: color-mix(in oklab, var(--color-danger) 65%, var(--color-text));
   padding: var(--button-padding-sm);
   border-radius: var(--button-radius-sm);
