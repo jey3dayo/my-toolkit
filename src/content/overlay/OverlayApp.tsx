@@ -1,8 +1,24 @@
 import { Button } from "@base-ui/react/button";
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AuxTextDisclosure } from "@/components/AuxTextDisclosure";
+import { ThemeCycleButton } from "@/components/ThemeCycleButton";
 import { CopyIcon, PinIcon } from "@/content/overlay/icons";
 import type { ExtractedEvent, Size, SummarySource } from "@/shared_types";
+import { applyTheme, type Theme } from "@/ui/theme";
+import { nextTheme } from "@/ui/themeCycle";
+import {
+  loadStoredTheme,
+  normalizeTheme,
+  persistTheme,
+  themeFromHost,
+} from "@/ui/themeStorage";
 import { createNotifications, ToastHost } from "@/ui/toast";
 
 export type OverlayViewModel = {
@@ -572,6 +588,7 @@ function OverlayBody(props: OverlayBodyProps): React.JSX.Element {
 export function OverlayApp(props: Props): React.JSX.Element | null {
   const { toastManager, notify } = useMemo(() => createNotifications(), []);
   const viewModel = props.viewModel;
+  const [theme, setTheme] = useState<Theme>(() => themeFromHost(props.host));
   const panelRef = useRef<HTMLDivElement | null>(null);
   const pinPopoverId = useId();
   const [panelSize, setPanelSize] = useState<PanelSize>({
@@ -582,6 +599,59 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
   const [pinnedPos, setPinnedPos] = useState<Point | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragOffsetRef = useRef<DragOffset | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    const fallback = themeFromHost(props.host);
+
+    loadStoredTheme(fallback)
+      .then((storedTheme) => {
+        if (disposed) {
+          return;
+        }
+        setTheme(storedTheme);
+        applyTheme(storedTheme, props.portalContainer);
+      })
+      .catch(() => {
+        // no-op
+      });
+
+    if (typeof chrome === "undefined") {
+      return () => {
+        disposed = true;
+      };
+    }
+
+    const onChanged = chrome.storage?.onChanged;
+    if (!onChanged?.addListener) {
+      return () => {
+        disposed = true;
+      };
+    }
+
+    const handleChange = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      areaName: string
+    ): void => {
+      if (areaName !== "local") {
+        return;
+      }
+      if (!("theme" in changes)) {
+        return;
+      }
+      const change = changes.theme as chrome.storage.StorageChange | undefined;
+      const nextValue = normalizeTheme(change?.newValue);
+      setTheme(nextValue);
+      applyTheme(nextValue, props.portalContainer);
+    };
+
+    onChanged.addListener(handleChange);
+
+    return () => {
+      disposed = true;
+      onChanged.removeListener?.(handleChange);
+    };
+  }, [props.host, props.portalContainer]);
 
   useLayoutEffect(() => {
     if (!viewModel.open) {
@@ -712,6 +782,15 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
     toggleOverlayPinned({ pinned, setPinned, setPinnedPos });
   };
 
+  const toggleTheme = (): void => {
+    const next = nextTheme(theme);
+    setTheme(next);
+    applyTheme(next, props.portalContainer);
+    persistTheme(next).catch(() => {
+      // no-op
+    });
+  };
+
   const sourceLabel = sourceLabelFromSource(viewModel.source);
   const statusLabel = statusLabelFromStatus(viewModel.status);
   const { selectionText, secondaryText } = deriveSecondaryText(
@@ -773,6 +852,12 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
                 </div>
               </div>
             </div>
+            <ThemeCycleButton
+              className="mbu-overlay-action mbu-overlay-icon-button"
+              onToggle={toggleTheme}
+              testId="overlay-theme"
+              theme={theme}
+            />
             <Button
               aria-label="閉じる"
               className="mbu-overlay-action mbu-overlay-icon-button"

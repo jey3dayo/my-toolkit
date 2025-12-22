@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { expect, fn, waitFor } from "storybook/test";
+import { expect, fn, userEvent, waitFor } from "storybook/test";
 import {
   OverlayApp,
   type OverlayViewModel,
@@ -397,6 +397,56 @@ export const PromptReady: Story = {
     expect(auxSummary?.textContent).toContain("選択したテキスト");
     expect(quote?.textContent).toContain("Google Meet");
     expect(shadow?.querySelector(".mbu-overlay-secondary-text")).toBeNull();
+  },
+};
+
+export const ThemeToggle: Story = {
+  args: {
+    status: "ready",
+    mode: "text",
+    source: "selection",
+    title: "要約",
+    primary: "要約結果（storybook）",
+    secondary: "選択範囲:\n引用テキスト",
+  },
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      const host = canvasElement.querySelector<HTMLDivElement>(
+        "#my-browser-utils-overlay"
+      );
+      const shadow = host?.shadowRoot ?? null;
+      expect(
+        shadow?.querySelector('[data-testid="overlay-theme"]')
+      ).toBeTruthy();
+    });
+
+    const host = canvasElement.querySelector<HTMLDivElement>(
+      "#my-browser-utils-overlay"
+    );
+    const shadow = host?.shadowRoot ?? null;
+    const themeButton = shadow?.querySelector<HTMLButtonElement>(
+      '[data-testid="overlay-theme"]'
+    );
+    if (!themeButton) {
+      throw new Error("overlay theme button not found");
+    }
+
+    expect(themeButton.getAttribute("aria-label")).toContain("自動");
+
+    await userEvent.click(themeButton);
+    await waitFor(() => {
+      expect(themeButton.getAttribute("aria-label")).toContain("ライト");
+    });
+
+    await userEvent.click(themeButton);
+    await waitFor(() => {
+      expect(themeButton.getAttribute("aria-label")).toContain("ダーク");
+    });
+
+    await userEvent.click(themeButton);
+    await waitFor(() => {
+      expect(themeButton.getAttribute("aria-label")).toContain("自動");
+    });
   },
 };
 

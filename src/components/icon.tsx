@@ -5,7 +5,10 @@ import {
   type LucideProps,
   MapPin,
   Menu,
+  Monitor,
+  Moon,
   Settings,
+  Sun,
   Table,
   X,
   Zap,
@@ -17,8 +20,11 @@ export type IconName =
   | "copy"
   | "link"
   | "menu"
+  | "monitor"
+  | "moon"
   | "pin"
   | "settings"
+  | "sun"
   | "table"
   | "zap";
 
@@ -28,8 +34,11 @@ const icons: Record<IconName, React.ComponentType<LucideProps>> = {
   copy: Copy,
   link: Link,
   menu: Menu,
+  monitor: Monitor,
+  moon: Moon,
   pin: MapPin,
   settings: Settings,
+  sun: Sun,
   table: Table,
   zap: Zap,
 };

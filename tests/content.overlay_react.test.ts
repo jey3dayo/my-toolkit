@@ -186,6 +186,49 @@ describe("content overlay (React + Shadow DOM)", () => {
     expect(shadow?.querySelector('[data-testid="overlay-copy"]')).toBeNull();
   });
 
+  it("cycles overlay theme and persists it to storage", async () => {
+    await import("@/content.ts");
+    const [listener] = listeners;
+    if (!listener) {
+      throw new Error("missing message listener");
+    }
+
+    await dispatchMessage(
+      listener,
+      {
+        action: "showActionOverlay",
+        status: "ready",
+        mode: "text",
+        source: "page",
+        title: "Test",
+        primary: "hello",
+      },
+      dom.window
+    );
+
+    const host = dom.window.document.querySelector<HTMLDivElement>(
+      "#my-browser-utils-overlay"
+    );
+    const shadow = host?.shadowRoot ?? null;
+    expect(shadow).not.toBeNull();
+
+    const themeButton = shadow?.querySelector<HTMLButtonElement>(
+      '[data-testid="overlay-theme"]'
+    );
+    if (!themeButton) {
+      throw new Error("overlay theme button not found");
+    }
+
+    expect(themeButton.getAttribute("aria-label")).toContain("自動");
+
+    themeButton.click();
+    await flush(dom.window, 6);
+
+    const lastCall = chromeStub.storage.local.set.mock.calls.at(-1);
+    expect(lastCall?.[0]).toEqual({ theme: "light" });
+    expect(themeButton.getAttribute("aria-label")).toContain("ライト");
+  });
+
   it("does not duplicate the source label in summary overlay titles", async () => {
     await import("@/content.ts");
     const [listener] = listeners;
@@ -287,17 +330,24 @@ describe("content overlay (React + Shadow DOM)", () => {
     const pin = shadow?.querySelector<HTMLElement>(
       '[data-testid="overlay-pin"]'
     );
+    const theme = shadow?.querySelector<HTMLElement>(
+      '[data-testid="overlay-theme"]'
+    );
     const close = shadow?.querySelector<HTMLElement>(
       '[data-testid="overlay-close"]'
     );
     expect(pin).not.toBeNull();
+    expect(theme).not.toBeNull();
     expect(close).not.toBeNull();
     const buttons = Array.from(actions?.querySelectorAll("button") ?? []);
     const pinIndex = buttons.indexOf(pin as HTMLButtonElement);
+    const themeIndex = buttons.indexOf(theme as HTMLButtonElement);
     const closeIndex = buttons.indexOf(close as HTMLButtonElement);
     expect(pinIndex).toBeGreaterThan(-1);
+    expect(themeIndex).toBeGreaterThan(-1);
     expect(closeIndex).toBeGreaterThan(-1);
-    expect(pinIndex).toBe(closeIndex - 1);
+    expect(pinIndex).toBe(themeIndex - 1);
+    expect(themeIndex).toBe(closeIndex - 1);
 
     expect(shadow?.textContent).not.toContain("（選択範囲）");
     expect(shadow?.textContent).toContain("選択範囲");
