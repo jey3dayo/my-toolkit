@@ -6,12 +6,12 @@ import { Icon } from "@/components/icon";
 import { coercePaneId, getPaneIdFromHash, type PaneId } from "@/popup/panes";
 import { ActionsPane } from "@/popup/panes/ActionsPane";
 import { CreateLinkPane } from "@/popup/panes/CreateLinkPane";
-import type { LinkFormat } from "@/popup/panes/create_link/format";
 import { SettingsPane } from "@/popup/panes/SettingsPane";
 import { TablePane } from "@/popup/panes/TablePane";
 import { createPopupRuntime } from "@/popup/runtime";
 import type { CopyTitleLinkFailure } from "@/storage/types";
 import { createNotifications, ToastHost } from "@/ui/toast";
+import { coerceLinkFormat, type LinkFormat } from "@/utils/link_format";
 
 function replaceHash(nextHash: string): void {
   try {
@@ -69,7 +69,16 @@ function coerceCopyTitleLinkFailure(
   if (typeof v.error !== "string") {
     return Result.fail("invalid");
   }
-  return Result.succeed(value as CopyTitleLinkFailure);
+  const format = coerceLinkFormat(v.format);
+  return Result.succeed({
+    occurredAt: v.occurredAt as number,
+    tabId: v.tabId as number,
+    pageTitle: v.pageTitle as string,
+    pageUrl: v.pageUrl as string,
+    text: v.text as string,
+    error: v.error as string,
+    ...(format ? { format } : {}),
+  });
 }
 
 async function loadCopyTitleLinkFailure(runtime: {
@@ -142,7 +151,7 @@ async function handleCopyTitleLinkFailureOnPopupOpen(params: {
     title: failure.pageTitle,
     url: failure.pageUrl,
   });
-  params.setCreateLinkInitialFormat("text");
+  params.setCreateLinkInitialFormat(failure.format ?? "text");
   params.navigateToCreateLink();
 
   params.notify.error(

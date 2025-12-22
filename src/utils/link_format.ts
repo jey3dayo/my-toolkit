@@ -6,12 +6,22 @@ export const LINK_FORMATS = [
   "org",
   "bbcode",
 ] as const;
+
 export type LinkFormat = (typeof LINK_FORMATS)[number];
 
 export type LinkSource = {
   title: string;
   url: string;
 };
+
+const LINK_FORMAT_SET = new Set<string>(LINK_FORMATS);
+
+export function coerceLinkFormat(value: unknown): LinkFormat | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  return LINK_FORMAT_SET.has(value) ? (value as LinkFormat) : null;
+}
 
 export const LINK_FORMAT_OPTIONS: ReadonlyArray<{
   value: LinkFormat;

@@ -1,4 +1,5 @@
 import type { Theme } from "@/ui/theme";
+import type { LinkFormat } from "@/utils/link_format";
 
 export type CopyTitleLinkFailure = {
   occurredAt: number;
@@ -7,6 +8,7 @@ export type CopyTitleLinkFailure = {
   pageUrl: string;
   text: string;
   error: string;
+  format?: LinkFormat;
 };
 
 export type LocalStorageData = {

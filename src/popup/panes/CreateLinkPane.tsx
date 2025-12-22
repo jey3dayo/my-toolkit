@@ -3,12 +3,13 @@ import { Input } from "@base-ui/react/input";
 import { Select } from "@base-ui/react/select";
 import { Result } from "@praha/byethrow";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import type { PopupPaneBaseProps } from "@/popup/panes/types";
 import {
+  coerceLinkFormat,
   formatLink,
   LINK_FORMAT_OPTIONS,
   type LinkFormat,
-} from "@/popup/panes/create_link/format";
-import type { PopupPaneBaseProps } from "@/popup/panes/types";
+} from "@/utils/link_format";
 
 export type CreateLinkPaneProps = PopupPaneBaseProps & {
   initialLink?: { title: string; url: string };
@@ -65,6 +66,49 @@ export function CreateLinkPane(props: CreateLinkPaneProps): React.JSX.Element {
     }
     setFormat(props.initialFormat);
   }, [props.initialFormat]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (props.initialFormat) {
+        return;
+      }
+      const stored = await props.runtime.storageSyncGet(["linkFormat"]);
+      if (Result.isFailure(stored)) {
+        return;
+      }
+      if (cancelled) {
+        return;
+      }
+      const next = coerceLinkFormat(stored.value.linkFormat);
+      if (!next) {
+        return;
+      }
+      setFormat(next);
+    })().catch(() => {
+      // no-op
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [props.initialFormat, props.runtime]);
+
+  const handleFormatChange = useCallback(
+    async (value: string): Promise<void> => {
+      const next = coerceLinkFormat(value);
+      if (!next) {
+        return;
+      }
+      const prev = format;
+      setFormat(next);
+      const saved = await props.runtime.storageSyncSet({ linkFormat: next });
+      if (Result.isFailure(saved)) {
+        setFormat(prev);
+        props.notify.error("形式の保存に失敗しました");
+      }
+    },
+    [format, props.notify, props.runtime]
+  );
 
   const copyOutput = async (): Promise<void> => {
     const text = output.trim();
@@ -148,13 +192,9 @@ export function CreateLinkPane(props: CreateLinkPaneProps): React.JSX.Element {
               if (typeof value !== "string") {
                 return;
               }
-              const next = LINK_FORMAT_OPTIONS.find(
-                (option) => option.value === value
-              )?.value;
-              if (!next) {
-                return;
-              }
-              setFormat(next);
+              handleFormatChange(value).catch(() => {
+                // no-op
+              });
             }}
             value={format}
           >

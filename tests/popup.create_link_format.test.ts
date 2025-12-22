@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatLink } from "@/popup/panes/create_link/format";
+import { formatLink } from "@/utils/link_format";
 
 describe("create link formatLink", () => {
   it("formats markdown links", () => {

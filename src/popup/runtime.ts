@@ -3,11 +3,13 @@ import type { ContextAction } from "@/context_actions";
 import type { ExtractedEvent, SummarySource } from "@/shared_types";
 import type { LocalStorageData } from "@/storage/types";
 import { toErrorMessage } from "@/utils/errors";
+import type { LinkFormat } from "@/utils/link_format";
 
 export type SyncStorageData = {
   domainPatterns?: string[];
   autoEnableSort?: boolean;
   contextActions?: ContextAction[];
+  linkFormat?: LinkFormat;
 };
 
 export type EnableTableSortMessage = { action: "enableTableSort" };
