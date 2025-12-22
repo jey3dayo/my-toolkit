@@ -23,12 +23,20 @@ body {
   background:
     radial-gradient(
       circle at 20% 20%,
-      color-mix(in oklab, var(--color-primary) var(--accent-mix-8), transparent),
+      color-mix(
+        in oklab,
+        var(--color-primary) var(--accent-mix-8),
+        transparent
+      ),
       transparent 30%
     ),
     radial-gradient(
       circle at 80% 0%,
-      color-mix(in oklab, var(--color-primary-2) var(--accent-mix-8), transparent),
+      color-mix(
+        in oklab,
+        var(--color-primary-2) var(--accent-mix-8),
+        transparent
+      ),
       transparent 28%
     ), var(--color-bg);
 }
