@@ -8,8 +8,13 @@ import {
   normalizeContextActions,
 } from "@/context_actions";
 import { loadOpenAiModel, loadOpenAiSettings } from "@/openai/settings";
-import type { ExtractedEvent, SummarySource } from "@/shared_types";
+import type {
+  CalendarRegistrationTarget,
+  ExtractedEvent,
+  SummarySource,
+} from "@/shared_types";
 import type { CopyTitleLinkFailure, LocalStorageData } from "@/storage/types";
+import { resolveCalendarTargets } from "@/utils/calendar_targets";
 import {
   parseDateOnlyToYyyyMmDd,
   parseDateTimeLoose,
@@ -72,9 +77,7 @@ type RunContextActionResponse =
   | {
       ok: true;
       resultType: "event";
-      event: ExtractedEvent;
       eventText: string;
-      calendarUrl: string;
       source: SummarySource;
     }
   | { ok: false; error: string };
@@ -82,11 +85,13 @@ type RunContextActionResponse =
 type SyncStorageData = {
   contextActions?: ContextAction[];
   linkFormat?: LinkFormat;
+  calendarTargets?: CalendarRegistrationTarget[];
 };
 
 const CONTEXT_MENU_ROOT_ID = "mbu-root";
 const CONTEXT_MENU_ACTION_PREFIX = "mbu-action:";
 const CONTEXT_MENU_COPY_TITLE_LINK_ID = "mbu-copy-title-link";
+const CONTEXT_MENU_CALENDAR_ID = "mbu-calendar-register";
 const CONTEXT_MENU_BUILTIN_SEPARATOR_ID = "mbu-separator:builtins";
 
 // Regex patterns at module level for performance (lint/performance/useTopLevelRegex)
@@ -365,6 +370,82 @@ async function showContextMenuUnexpectedErrorOverlay(
   });
 }
 
+async function handleCalendarContextMenuClick(params: {
+  tabId: number;
+  info: chrome.contextMenus.OnClickData;
+  tab?: chrome.tabs.Tab;
+}): Promise<void> {
+  const context = buildContextMenuSelectionContext(params.info);
+  const initialSuffix = titleSuffixBySource(context.initialSource);
+  const initialTitle = `カレンダー登録（${initialSuffix}）`;
+
+  await sendMessageToTab(params.tabId, {
+    action: "showActionOverlay",
+    status: "loading",
+    mode: "event",
+    source: context.initialSource,
+    title: initialTitle,
+    secondary: context.selectionSecondary,
+  } satisfies ContentScriptMessage);
+
+  const target = await resolveTargetFromContextMenuClick({
+    tabId: params.tabId,
+    selection: context.selection,
+    tab: params.tab,
+  });
+  const resolvedTitle = `カレンダー登録（${titleSuffixBySource(
+    target.source
+  )}）`;
+
+  const result = await extractEventWithOpenAI(target);
+  if (!result.ok) {
+    await sendMessageToTab(params.tabId, {
+      action: "showActionOverlay",
+      status: "error",
+      mode: "event",
+      source: target.source,
+      title: resolvedTitle,
+      primary: result.error,
+      secondary: context.tokenHintSecondary,
+    } satisfies ContentScriptMessage);
+    return;
+  }
+
+  const calendarTargets = await loadCalendarTargets();
+  if (calendarTargets.length === 0) {
+    await sendMessageToTab(params.tabId, {
+      action: "showNotification",
+      message:
+        "カレンダー登録先が未選択です（ポップアップの「カレンダー」タブで設定してください）",
+    } satisfies ContentScriptMessage).catch(() => {
+      // no-op
+    });
+  }
+
+  const artifacts = buildCalendarArtifacts(result.event, calendarTargets);
+  if (artifacts.errors.length > 0) {
+    await sendMessageToTab(params.tabId, {
+      action: "showNotification",
+      message: artifacts.errors.join("\n"),
+    } satisfies ContentScriptMessage).catch(() => {
+      // no-op
+    });
+  }
+
+  await sendMessageToTab(params.tabId, {
+    action: "showActionOverlay",
+    status: "ready",
+    mode: "event",
+    source: target.source,
+    title: resolvedTitle,
+    primary: artifacts.eventText,
+    secondary: context.selectionSecondary,
+    calendarUrl: artifacts.calendarUrl,
+    ics: artifacts.ics,
+    event: result.event,
+  } satisfies ContentScriptMessage);
+}
+
 async function handleContextMenuClick(params: {
   tabId: number;
   menuItemId: string;
@@ -434,31 +515,15 @@ async function handleEventAction(context: OverlayContext): Promise<void> {
     return;
   }
 
-  const calendarData = buildEventCalendarData(result.event);
-  if (!calendarData.ok) {
-    await sendMessageToTab(tabId, {
-      action: "showActionOverlay",
-      status: "error",
-      mode: "event",
-      source: target.source,
-      title: resolvedTitle,
-      primary: calendarData.error,
-      secondary: selectionSecondary,
-    });
-    return;
-  }
-
-  const ics = buildIcs(result.event) ?? undefined;
+  const eventText = formatEventText(result.event);
   await sendMessageToTab(tabId, {
     action: "showActionOverlay",
     status: "ready",
     mode: "event",
     source: target.source,
     title: resolvedTitle,
-    primary: calendarData.eventText,
+    primary: eventText,
     secondary: selectionSecondary,
-    calendarUrl: calendarData.calendarUrl,
-    ics,
     event: result.event,
   });
 }
@@ -532,6 +597,13 @@ chrome.contextMenus.onClicked.addListener(
       return;
     }
 
+    if (menuItemId === CONTEXT_MENU_CALENDAR_ID) {
+      handleCalendarContextMenuClick({ tabId, info, tab }).catch(() => {
+        // no-op
+      });
+      return;
+    }
+
     if (!menuItemId.startsWith(CONTEXT_MENU_ACTION_PREFIX)) {
       return;
     }
@@ -579,6 +651,25 @@ async function refreshContextMenus(): Promise<void> {
           id: CONTEXT_MENU_COPY_TITLE_LINK_ID,
           parentId: CONTEXT_MENU_ROOT_ID,
           title: "タイトルとリンクをコピー",
+          contexts: ["page", "selection"],
+        },
+        () => {
+          const err = chrome.runtime.lastError;
+          if (err) {
+            reject(new Error(err.message));
+            return;
+          }
+          resolve();
+        }
+      );
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      chrome.contextMenus.create(
+        {
+          id: CONTEXT_MENU_CALENDAR_ID,
+          parentId: CONTEXT_MENU_ROOT_ID,
+          title: "カレンダー登録",
           contexts: ["page", "selection"],
         },
         () => {
@@ -647,30 +738,9 @@ async function ensureContextActionsInitialized(): Promise<ContextAction[]> {
   return DEFAULT_CONTEXT_ACTIONS;
 }
 
-type ExtractEventWithCalendarDataResult =
-  | { ok: false; error: string }
-  | { ok: true; event: ExtractedEvent; calendarUrl: string; eventText: string };
-
-async function extractEventWithCalendarData(
-  target: SummaryTarget,
-  extraInstruction?: string
-): Promise<ExtractEventWithCalendarDataResult> {
-  const result = await extractEventWithOpenAI(target, extraInstruction);
-  if (!result.ok) {
-    return result;
-  }
-
-  const calendarData = buildEventCalendarData(result.event);
-  if (!calendarData.ok) {
-    return { ok: false, error: calendarData.error };
-  }
-
-  return {
-    ok: true,
-    event: result.event,
-    calendarUrl: calendarData.calendarUrl,
-    eventText: calendarData.eventText,
-  };
+async function loadCalendarTargets(): Promise<CalendarRegistrationTarget[]> {
+  const stored = (await storageSyncGet(["calendarTargets"])) as SyncStorageData;
+  return resolveCalendarTargets(stored.calendarTargets);
 }
 
 // Helper function for handling event actions in message listener
@@ -683,19 +753,18 @@ async function handleEventActionInMessage(
   const extraInstruction = action.prompt?.trim()
     ? renderInstructionTemplate(action.prompt, target)
     : undefined;
-  const result = await extractEventWithCalendarData(target, extraInstruction);
+  const result = await extractEventWithOpenAI(target, extraInstruction);
 
   if (!result.ok) {
     sendResponse(result);
     return;
   }
 
+  const eventText = formatEventText(result.event);
   sendResponse({
     ok: true,
     resultType: "event",
-    event: result.event,
-    calendarUrl: result.calendarUrl,
-    eventText: result.eventText,
+    eventText,
     source: target.source,
   });
 }
@@ -734,13 +803,30 @@ async function handleSummarizeEventInMessage(
       | {
           ok: true;
           event: ExtractedEvent;
-          calendarUrl: string;
           eventText: string;
+          calendarUrl?: string;
+          calendarError?: string;
         }
   ) => void
 ): Promise<void> {
-  const result = await extractEventWithCalendarData(target);
-  sendResponse(result);
+  const result = await extractEventWithOpenAI(target);
+  if (!result.ok) {
+    sendResponse(result);
+    return;
+  }
+
+  const eventText = formatEventText(result.event);
+  const calendarUrl = buildGoogleCalendarUrl(result.event) ?? undefined;
+  const calendarError = calendarUrl
+    ? undefined
+    : buildGoogleCalendarUrlFailureMessage(result.event);
+  sendResponse({
+    ok: true,
+    event: result.event,
+    eventText,
+    calendarUrl,
+    calendarError,
+  });
 }
 
 chrome.runtime.onMessage.addListener(
@@ -760,8 +846,9 @@ chrome.runtime.onMessage.addListener(
         | {
             ok: true;
             event: ExtractedEvent;
-            calendarUrl: string;
             eventText: string;
+            calendarUrl?: string;
+            calendarError?: string;
           }
     ) => void
   ) => {
@@ -1452,16 +1539,39 @@ function buildGoogleCalendarUrlFailureMessage(event: ExtractedEvent): string {
   }`;
 }
 
-function buildEventCalendarData(
-  event: ExtractedEvent
-):
-  | { ok: true; calendarUrl: string; eventText: string }
-  | { ok: false; error: string } {
-  const calendarUrl = buildGoogleCalendarUrl(event);
-  if (!calendarUrl) {
-    return { ok: false, error: buildGoogleCalendarUrlFailureMessage(event) };
+function buildCalendarArtifacts(
+  event: ExtractedEvent,
+  targets: CalendarRegistrationTarget[]
+): {
+  eventText: string;
+  calendarUrl?: string;
+  ics?: string;
+  errors: string[];
+} {
+  const errors: string[] = [];
+  const eventText = formatEventText(event);
+
+  let calendarUrl: string | undefined;
+  if (targets.includes("google")) {
+    const url = buildGoogleCalendarUrl(event);
+    if (url) {
+      calendarUrl = url;
+    } else {
+      errors.push(buildGoogleCalendarUrlFailureMessage(event));
+    }
   }
-  return { ok: true, calendarUrl, eventText: formatEventText(event) };
+
+  let ics: string | undefined;
+  if (targets.includes("ics")) {
+    const icsText = buildIcs(event);
+    if (icsText) {
+      ics = icsText;
+    } else {
+      errors.push(".ics の生成に失敗しました");
+    }
+  }
+
+  return { eventText, calendarUrl, ics, errors };
 }
 
 function buildGoogleCalendarUrl(event: ExtractedEvent): string | null {

@@ -401,22 +401,26 @@ function OverlayEventModeActions(
 ): React.JSX.Element {
   return (
     <div className="mbu-overlay-body-actions">
-      <Button
-        className="mbu-overlay-action"
-        disabled={!props.canOpenCalendar}
-        onClick={props.onOpenCalendar}
-        type="button"
-      >
-        Googleカレンダーに登録
-      </Button>
-      <Button
-        className="mbu-overlay-action"
-        disabled={!props.canDownloadIcs}
-        onClick={props.onDownloadIcs}
-        type="button"
-      >
-        .ics
-      </Button>
+      {props.canOpenCalendar ? (
+        <Button
+          className="mbu-overlay-action"
+          disabled={!props.canOpenCalendar}
+          onClick={props.onOpenCalendar}
+          type="button"
+        >
+          Googleカレンダーに登録
+        </Button>
+      ) : null}
+      {props.canDownloadIcs ? (
+        <Button
+          className="mbu-overlay-action"
+          disabled={!props.canDownloadIcs}
+          onClick={props.onDownloadIcs}
+          type="button"
+        >
+          .ics
+        </Button>
+      ) : null}
       {props.canCopyPrimary ? (
         <OverlayCopyButton
           disabled={!props.canCopyPrimary}

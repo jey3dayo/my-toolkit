@@ -1,4 +1,5 @@
 import {
+  Calendar,
   Copy,
   Link,
   type LucideProps,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 
 export type IconName =
+  | "calendar"
   | "close"
   | "copy"
   | "link"
@@ -21,6 +23,7 @@ export type IconName =
   | "zap";
 
 const icons: Record<IconName, React.ComponentType<LucideProps>> = {
+  calendar: Calendar,
   close: X,
   copy: Copy,
   link: Link,

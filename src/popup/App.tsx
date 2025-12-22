@@ -6,6 +6,7 @@ import { APP_NAME } from "@/app_meta";
 import { Icon } from "@/components/icon";
 import { coercePaneId, getPaneIdFromHash, type PaneId } from "@/popup/panes";
 import { ActionsPane } from "@/popup/panes/ActionsPane";
+import { CalendarPane } from "@/popup/panes/CalendarPane";
 import { CreateLinkPane } from "@/popup/panes/CreateLinkPane";
 import { SettingsPane } from "@/popup/panes/SettingsPane";
 import { TablePane } from "@/popup/panes/TablePane";
@@ -223,7 +224,7 @@ export function PopupApp(): React.JSX.Element {
 
   useEffect(() => {
     document.title = APP_NAME;
-  }, [APP_NAME]);
+  }, []);
 
   useEffect(() => {
     document.body.classList.toggle("menu-open", menuOpen);
@@ -287,6 +288,14 @@ export function PopupApp(): React.JSX.Element {
                 runtime={runtime}
               />
             </Tabs.Panel>
+            <Tabs.Panel data-pane="pane-calendar" value="pane-calendar">
+              <CalendarPane
+                focusTokenInput={focusTokenInput}
+                navigateToPane={navigateToPane}
+                notify={notifications.notify}
+                runtime={runtime}
+              />
+            </Tabs.Panel>
             <Tabs.Panel data-pane="pane-table" value="pane-table">
               <TablePane notify={notifications.notify} runtime={runtime} />
             </Tabs.Panel>
@@ -325,6 +334,18 @@ export function PopupApp(): React.JSX.Element {
                   <Icon aria-hidden="true" name="zap" />
                 </span>
                 <span className="nav-label">アクション</span>
+              </Tabs.Tab>
+              <Tabs.Tab
+                aria-label="カレンダー登録"
+                className="nav-item"
+                data-tooltip="カレンダー登録"
+                data-value="pane-calendar"
+                value="pane-calendar"
+              >
+                <span aria-hidden="true" className="nav-icon">
+                  <Icon aria-hidden="true" name="calendar" />
+                </span>
+                <span className="nav-label">カレンダー登録</span>
               </Tabs.Tab>
               <Tabs.Tab
                 aria-label="テーブルソート"
@@ -395,6 +416,23 @@ export function PopupApp(): React.JSX.Element {
                       <Icon aria-hidden="true" name="zap" />
                     </span>
                     アクション
+                  </Button>
+                  <Button
+                    aria-current={
+                      tabValue === "pane-calendar" ? "page" : undefined
+                    }
+                    className={
+                      tabValue === "pane-calendar"
+                        ? "menu-item active"
+                        : "menu-item"
+                    }
+                    onClick={() => navigateToPane("pane-calendar")}
+                    type="button"
+                  >
+                    <span aria-hidden="true" className="menu-icon">
+                      <Icon aria-hidden="true" name="calendar" />
+                    </span>
+                    カレンダー登録
                   </Button>
                   <Button
                     aria-current={

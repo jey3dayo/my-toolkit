@@ -3,6 +3,8 @@ import type {
   ActiveTabInfo,
   PopupRuntime,
   RunContextActionRequest,
+  SummarizeEventRequest,
+  SummaryTarget,
   SyncStorageData,
   TestOpenAiTokenRequest,
 } from "@/popup/runtime";
@@ -20,7 +22,11 @@ type Options = {
     runContextAction?: (
       message: RunContextActionRequest
     ) => unknown | Promise<unknown>;
+    summarizeEvent?: (
+      message: SummarizeEventRequest
+    ) => unknown | Promise<unknown>;
   };
+  summaryTarget?: SummaryTarget;
 };
 
 type InMemoryStorageArea<T extends Record<string, unknown>> = {
@@ -130,9 +136,31 @@ export function createStoryPopupRuntime(options: Options = {}): PopupRuntime {
         } as never);
       }
 
+      if (action === "summarizeEvent") {
+        if (options.background?.summarizeEvent) {
+          return Result.succeed(
+            (await options.background.summarizeEvent(
+              message as SummarizeEventRequest
+            )) as never
+          );
+        }
+        return Result.succeed({
+          ok: false,
+          error: "storybook runtime: not implemented",
+        } as never);
+      }
+
       return Result.succeed({} as never);
     },
-    sendMessageToTab: async () => Result.succeed({ success: true } as never),
+    sendMessageToTab: async () =>
+      Result.succeed(
+        (options.summaryTarget ?? {
+          text: "storybook summary target",
+          source: "selection",
+          title: "storybook title",
+          url: "https://example.com",
+        }) as never
+      ),
     openUrl: (url) => {
       try {
         const trimmed = url.trim();

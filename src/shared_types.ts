@@ -8,3 +8,5 @@ export type ExtractedEvent = {
   location?: string;
   description?: string;
 };
+
+export type CalendarRegistrationTarget = "google" | "ics";

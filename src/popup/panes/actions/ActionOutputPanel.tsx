@@ -4,11 +4,7 @@ type Props = {
   title: string;
   value: string;
   canCopy: boolean;
-  canOpenCalendar: boolean;
-  canDownloadIcs: boolean;
   onCopy: () => void;
-  onOpenCalendar: () => void;
-  onDownloadIcs: () => void;
 };
 
 export function ActionOutputPanel(props: Props): React.JSX.Element {
@@ -27,28 +23,6 @@ export function ActionOutputPanel(props: Props): React.JSX.Element {
             type="button"
           >
             コピー
-          </Button>
-          <Button
-            className="btn btn-ghost btn-small"
-            data-testid="open-calendar"
-            disabled={!props.canOpenCalendar}
-            onClick={() => {
-              props.onOpenCalendar();
-            }}
-            type="button"
-          >
-            カレンダー
-          </Button>
-          <Button
-            className="btn btn-ghost btn-small"
-            data-testid="download-ics"
-            disabled={!props.canDownloadIcs}
-            onClick={() => {
-              props.onDownloadIcs();
-            }}
-            type="button"
-          >
-            .ics
           </Button>
         </div>
       </div>

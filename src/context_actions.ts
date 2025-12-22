@@ -35,12 +35,6 @@ export const DEFAULT_CONTEXT_ACTIONS: ContextAction[] = [
       "{{text}}",
     ].join("\n"),
   },
-  {
-    id: "builtin:calendar",
-    title: "カレンダー登録する",
-    kind: "event",
-    prompt: "",
-  },
 ];
 
 function coerceContextAction(value: unknown): ContextAction | null {
@@ -71,6 +65,9 @@ export function normalizeContextActions(value: unknown): ContextAction[] {
   for (const item of value) {
     const action = coerceContextAction(item);
     if (!action) {
+      continue;
+    }
+    if (action.id === "builtin:calendar") {
       continue;
     }
     actions.push(action);

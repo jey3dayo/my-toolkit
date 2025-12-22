@@ -1,6 +1,10 @@
 import { Result } from "@praha/byethrow";
 import type { ContextAction } from "@/context_actions";
-import type { ExtractedEvent, SummarySource } from "@/shared_types";
+import type {
+  CalendarRegistrationTarget,
+  ExtractedEvent,
+  SummarySource,
+} from "@/shared_types";
 import type { LocalStorageData } from "@/storage/types";
 import { toErrorMessage } from "@/utils/errors";
 import type { LinkFormat } from "@/utils/link_format";
@@ -10,6 +14,7 @@ export type SyncStorageData = {
   autoEnableSort?: boolean;
   contextActions?: ContextAction[];
   linkFormat?: LinkFormat;
+  calendarTargets?: CalendarRegistrationTarget[];
 };
 
 export type EnableTableSortMessage = { action: "enableTableSort" };
@@ -25,10 +30,29 @@ export type RunContextActionResponse =
   | {
       ok: true;
       resultType: "event";
+      eventText: string;
+      source: SummarySource;
+    }
+  | { ok: false; error: string };
+
+export type SummaryTarget = {
+  text: string;
+  source: SummarySource;
+  title?: string;
+  url?: string;
+};
+
+export type SummarizeEventRequest = {
+  action: "summarizeEvent";
+  target: SummaryTarget;
+};
+export type SummarizeEventResponse =
+  | {
+      ok: true;
       event: ExtractedEvent;
       eventText: string;
-      calendarUrl: string;
-      source: SummarySource;
+      calendarUrl?: string;
+      calendarError?: string;
     }
   | { ok: false; error: string };
 

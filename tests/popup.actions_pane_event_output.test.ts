@@ -12,7 +12,7 @@ import { createPopupDom } from "./helpers/popupDom";
   globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe("popup Actions pane: event output actions", () => {
+describe("popup Actions pane: event output", () => {
   let dom: JSDOM;
   let chromeStub: PopupChromeStub;
 
@@ -30,8 +30,8 @@ describe("popup Actions pane: event output actions", () => {
           callback({
             contextActions: [
               {
-                id: "builtin:calendar",
-                title: "カレンダー登録",
+                id: "custom:event",
+                title: "イベント抽出",
                 kind: "event",
                 prompt: "",
               },
@@ -70,10 +70,7 @@ describe("popup Actions pane: event output actions", () => {
           callback({
             ok: true,
             resultType: "event",
-            event: { title: "ミーティング", start: "2025-01-01", allDay: true },
             eventText: "予定: ミーティング",
-            calendarUrl:
-              "https://calendar.google.com/calendar/render?action=TEMPLATE",
             source: "selection",
           });
           return;
@@ -114,57 +111,20 @@ describe("popup Actions pane: event output actions", () => {
     vi.unstubAllGlobals();
   });
 
-  it("opens the calendar URL via chrome.tabs.create", async () => {
+  it("does not render calendar actions for event outputs", async () => {
     const runButton = dom.window.document.querySelector<HTMLButtonElement>(
-      'button[data-action-id="builtin:calendar"]'
+      'button[data-action-id="custom:event"]'
     );
     await act(async () => {
       runButton?.click();
-      await flush(dom.window);
-    });
-
-    const openButton = dom.window.document.querySelector<HTMLButtonElement>(
-      '[data-testid="open-calendar"]'
-    );
-    expect(openButton).not.toBeNull();
-
-    await act(async () => {
-      openButton?.click();
-      await flush(dom.window);
-    });
-
-    expect(chromeStub.tabs.create).toHaveBeenCalledWith({
-      url: "https://calendar.google.com/calendar/render?action=TEMPLATE",
-    });
-  });
-
-  it("downloads an .ics file for event results", async () => {
-    const runButton = dom.window.document.querySelector<HTMLButtonElement>(
-      'button[data-action-id="builtin:calendar"]'
-    );
-    await act(async () => {
-      runButton?.click();
-      await flush(dom.window);
-    });
-
-    const clickSpy = vi
-      .spyOn(dom.window.HTMLAnchorElement.prototype, "click")
-      .mockImplementation(() => undefined);
-
-    const downloadButton = dom.window.document.querySelector<HTMLButtonElement>(
-      '[data-testid="download-ics"]'
-    );
-    expect(downloadButton).not.toBeNull();
-
-    await act(async () => {
-      downloadButton?.click();
       await flush(dom.window);
     });
 
     expect(
-      (URL as unknown as { createObjectURL: ReturnType<typeof vi.fn> })
-        .createObjectURL
-    ).toHaveBeenCalled();
-    expect(clickSpy).toHaveBeenCalled();
+      dom.window.document.querySelector('[data-testid="open-calendar"]')
+    ).toBeNull();
+    expect(
+      dom.window.document.querySelector('[data-testid="download-ics"]')
+    ).toBeNull();
   });
 });

@@ -66,7 +66,7 @@ describe("popup layout structure", () => {
         'aside.sidebar [role="tab"]'
       )
     );
-    expect(tabButtons.length).toBe(4);
+    expect(tabButtons.length).toBe(5);
 
     for (const tab of tabButtons) {
       expect(tab.classList.contains("nav-item")).toBe(true);
