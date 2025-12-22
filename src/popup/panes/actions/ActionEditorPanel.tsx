@@ -128,7 +128,8 @@ export function ActionEditorPanel(props: Props): React.JSX.Element {
                         event とは
                       </Popover.Title>
                       <Popover.Description className="mbu-popover-description">
-                        event は日時・場所・概要などを抽出してイベント形式で返すモードです。
+                        event
+                        は日時・場所・概要などを抽出してイベント形式で返すモードです。
                         text はプロンプトに従って要約/翻訳などを行います。
                       </Popover.Description>
                     </Popover.Popup>

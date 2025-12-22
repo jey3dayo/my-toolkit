@@ -13,7 +13,7 @@ function readString(value: unknown): string | undefined {
   if (typeof value === "string" && value) {
     return value;
   }
-  return undefined;
+  return;
 }
 
 function extractCause(cause: unknown): string | undefined {

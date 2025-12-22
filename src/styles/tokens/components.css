@@ -218,11 +218,7 @@
   border-radius: 999px;
   background: var(--toast-accent);
   box-shadow: 0 0 0 3px
-    color-mix(
-      in oklab,
-      var(--toast-accent) var(--accent-mix-18),
-      transparent
-    );
+    color-mix(in oklab, var(--toast-accent) var(--accent-mix-18), transparent);
   flex: 0 0 auto;
 }
 
