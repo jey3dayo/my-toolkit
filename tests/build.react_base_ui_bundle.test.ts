@@ -6,13 +6,27 @@ import { describe, expect, it } from "vitest";
 describe("React/Base UI bundling", () => {
   it("defines process.env.NODE_ENV in the bundle script", async () => {
     const { default: fs } = await import("node:fs/promises");
+    const { default: path } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
     const pkg = JSON.parse(
       await fs.readFile(new URL("../package.json", import.meta.url), "utf-8")
     ) as {
       scripts?: Record<string, string>;
     };
 
-    expect(pkg.scripts?.bundle).toContain("--define:process.env.NODE_ENV=");
+    const bundleScript = pkg.scripts?.bundle ?? "";
+    if (bundleScript.includes("scripts/bundle.mjs")) {
+      const scriptPath = path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "..",
+        "scripts",
+        "bundle.mjs"
+      );
+      const scriptContents = await fs.readFile(scriptPath, "utf-8");
+      expect(scriptContents).toContain("process.env.NODE_ENV");
+    } else {
+      expect(bundleScript).toContain("--define:process.env.NODE_ENV=");
+    }
   });
 
   it("bundles React, ReactDOM, and @base-ui/react for MV3 targets", async () => {
