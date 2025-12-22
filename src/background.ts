@@ -196,6 +196,14 @@ type ContextMenuTabParams = {
   tab?: chrome.tabs.Tab;
 };
 
+type ContextMenuClickParams = ContextMenuTabParams & {
+  info: chrome.contextMenus.OnClickData;
+};
+
+type ContextMenuActionClickParams = ContextMenuClickParams & {
+  menuItemId: string;
+};
+
 type ContextMenuTargetParams = ContextMenuTabParams & {
   selection: string;
 };
@@ -376,11 +384,9 @@ async function showContextMenuUnexpectedErrorOverlay(
   });
 }
 
-async function handleCalendarContextMenuClick(params: {
-  tabId: number;
-  info: chrome.contextMenus.OnClickData;
-  tab?: chrome.tabs.Tab;
-}): Promise<void> {
+async function handleCalendarContextMenuClick(
+  params: ContextMenuClickParams
+): Promise<void> {
   const context = buildContextMenuSelectionContext(params.info);
   const initialSuffix = titleSuffixBySource(context.initialSource);
   const initialTitle = `カレンダー登録（${initialSuffix}）`;
@@ -452,12 +458,9 @@ async function handleCalendarContextMenuClick(params: {
   } satisfies ContentScriptMessage);
 }
 
-async function handleContextMenuClick(params: {
-  tabId: number;
-  menuItemId: string;
-  info: chrome.contextMenus.OnClickData;
-  tab?: chrome.tabs.Tab;
-}): Promise<void> {
+async function handleContextMenuClick(
+  params: ContextMenuActionClickParams
+): Promise<void> {
   const context = buildContextMenuSelectionContext(params.info);
   const actionId = params.menuItemId.slice(CONTEXT_MENU_ACTION_PREFIX.length);
 

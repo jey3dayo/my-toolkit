@@ -27,7 +27,7 @@ importers:
         specifier: ^19.2.3
         version: 19.2.3(react@19.2.3)
       smol-toml:
-        specifier: ^1.2.1
+        specifier: ^1.6.0
         version: 1.6.0
     devDependencies:
       '@biomejs/biome':

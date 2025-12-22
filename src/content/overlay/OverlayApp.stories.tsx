@@ -29,6 +29,40 @@ const LONG_PRIMARY_TEXT = [
   "",
   ...Array.from({ length: 18 }, (_, i) => `追加行 ${i + 1}: ダミーテキスト`),
 ].join("\n");
+const CONTEXT_SELECTION_TEXT =
+  "来週の定例ミーティングは2/12(木)10:00-11:00、Google Meetで実施します。";
+const CONTEXT_SELECTION_SECONDARY = `選択範囲:\n${CONTEXT_SELECTION_TEXT}`;
+const PROMPT_PRIMARY_TEXT = [
+  "了解しました。以下の観点で整理します。",
+  "",
+  "- 日時: 2/12(木) 10:00-11:00",
+  "- 場所: Google Meet",
+  "- 目的: 進捗共有と課題確認",
+].join("\n");
+const CALENDAR_EVENT: NonNullable<OverlayViewModel["event"]> = {
+  title: "プロジェクト定例ミーティング",
+  start: "2026-02-12T10:00:00+09:00",
+  end: "2026-02-12T11:00:00+09:00",
+  location: "Google Meet",
+  description: "進捗共有と課題確認",
+};
+const CALENDAR_PRIMARY_TEXT = [
+  `タイトル: ${CALENDAR_EVENT.title}`,
+  `日時: ${CALENDAR_EVENT.start} 〜 ${CALENDAR_EVENT.end ?? ""}`.trim(),
+  `場所: ${CALENDAR_EVENT.location ?? ""}`.trim(),
+  "",
+  "概要:",
+  CALENDAR_EVENT.description ?? "",
+].join("\n");
+const CALENDAR_URL = "https://calendar.google.com/";
+const CALENDAR_ICS = [
+  "BEGIN:VCALENDAR",
+  "VERSION:2.0",
+  "BEGIN:VEVENT",
+  "SUMMARY:プロジェクト定例ミーティング",
+  "END:VEVENT",
+  "END:VCALENDAR",
+].join("\n");
 
 const COMPONENTS_CSS_PATH = "src/styles/tokens/components.css";
 
@@ -39,6 +73,9 @@ type OverlayStoryArgs = {
   title: string;
   primary: string;
   secondary: string;
+  event?: OverlayViewModel["event"];
+  calendarUrl?: string;
+  ics?: string;
 };
 
 function OverlayAppStory(args: OverlayStoryArgs): React.JSX.Element {
@@ -114,6 +151,9 @@ function OverlayAppStory(args: OverlayStoryArgs): React.JSX.Element {
                 title: args.title,
                 primary,
                 secondary: args.secondary,
+                event: args.event,
+                calendarUrl: args.calendarUrl,
+                ics: args.ics,
                 anchorRect: null,
               }}
             />,
@@ -218,6 +258,9 @@ function OverlayAppFallbackStory(args: OverlayStoryArgs): React.JSX.Element {
                 title: args.title,
                 primary: args.primary,
                 secondary: args.secondary,
+                event: args.event,
+                calendarUrl: args.calendarUrl,
+                ics: args.ics,
                 anchorRect: null,
               }}
             />,
@@ -237,6 +280,9 @@ const meta = {
     mode: { control: false },
     source: { control: false },
     title: { control: false },
+    event: { control: false },
+    calendarUrl: { control: false },
+    ics: { control: false },
     primary: {
       control: "text",
     },
@@ -317,6 +363,43 @@ export const Ready: Story = {
   },
 };
 
+export const PromptReady: Story = {
+  args: {
+    status: "ready",
+    mode: "text",
+    source: "selection",
+    title: "プロンプト",
+    primary: PROMPT_PRIMARY_TEXT,
+    secondary: CONTEXT_SELECTION_SECONDARY,
+  },
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      const host = canvasElement.querySelector<HTMLDivElement>(
+        "#my-browser-utils-overlay"
+      );
+      const shadow = host?.shadowRoot ?? null;
+      expect(
+        shadow?.querySelector('[data-testid="overlay-copy"]')
+      ).toBeTruthy();
+    });
+
+    const host = canvasElement.querySelector<HTMLDivElement>(
+      "#my-browser-utils-overlay"
+    );
+    const shadow = host?.shadowRoot ?? null;
+    const title = shadow?.querySelector(".mbu-overlay-title");
+    const chip = shadow?.querySelector(".mbu-overlay-chip");
+    const auxSummary = shadow?.querySelector(".mbu-overlay-aux-summary");
+    const quote = shadow?.querySelector(".mbu-overlay-quote");
+
+    expect(title?.textContent).toContain("プロンプト");
+    expect(chip?.textContent).toContain("選択範囲");
+    expect(auxSummary?.textContent).toContain("選択したテキスト");
+    expect(quote?.textContent).toContain("Google Meet");
+    expect(shadow?.querySelector(".mbu-overlay-secondary-text")).toBeNull();
+  },
+};
+
 export const ReadyLongText: Story = {
   args: {
     status: "ready",
@@ -362,6 +445,53 @@ export const ReadyLongText: Story = {
     expect(copyRect.top).toBeLessThanOrEqual(primaryRect.top + 1);
 
     expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth + 1);
+  },
+};
+
+export const CalendarReady: Story = {
+  args: {
+    status: "ready",
+    mode: "event",
+    source: "selection",
+    title: "カレンダー登録",
+    primary: CALENDAR_PRIMARY_TEXT,
+    secondary: CONTEXT_SELECTION_SECONDARY,
+    event: CALENDAR_EVENT,
+    calendarUrl: CALENDAR_URL,
+    ics: CALENDAR_ICS,
+  },
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      const host = canvasElement.querySelector<HTMLDivElement>(
+        "#my-browser-utils-overlay"
+      );
+      const shadow = host?.shadowRoot ?? null;
+      expect(shadow?.querySelector(".mbu-overlay-event-table")).toBeTruthy();
+    });
+
+    const host = canvasElement.querySelector<HTMLDivElement>(
+      "#my-browser-utils-overlay"
+    );
+    const shadow = host?.shadowRoot ?? null;
+    const bodyActions = shadow?.querySelector<HTMLElement>(
+      ".mbu-overlay-body-actions"
+    );
+    const headerActions = shadow?.querySelector<HTMLElement>(
+      ".mbu-overlay-actions"
+    );
+    const quote = shadow?.querySelector<HTMLElement>(".mbu-overlay-quote");
+
+    expect(shadow?.textContent).toContain("プロジェクト定例ミーティング");
+    expect(shadow?.textContent).toContain("Google Meet");
+    expect(bodyActions?.textContent).toContain("Googleカレンダーに登録");
+    expect(bodyActions?.textContent).toContain(".ics");
+    expect(
+      bodyActions?.querySelector('[data-testid="overlay-copy"]')
+    ).toBeTruthy();
+    expect(
+      headerActions?.querySelector('[data-testid="overlay-copy"]')
+    ).toBeNull();
+    expect(quote?.textContent).toContain("Google Meet");
   },
 };
 

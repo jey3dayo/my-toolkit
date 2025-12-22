@@ -5,6 +5,7 @@ import {
   OverlayApp,
   type OverlayViewModel,
 } from "@/content/overlay/OverlayApp";
+import type { Size } from "@/shared_types";
 
 // Enable React's act() behavior warnings to be handled correctly in this test suite.
 (
@@ -17,7 +18,7 @@ async function flushEffects(times = 3): Promise<void> {
   }
 }
 
-function setWindowSize(size: { width: number; height: number }): void {
+function setWindowSize(size: Size): void {
   Object.defineProperty(window, "innerWidth", {
     configurable: true,
     value: size.width,

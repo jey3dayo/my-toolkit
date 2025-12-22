@@ -2,7 +2,7 @@ import { Button } from "@base-ui/react/button";
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AuxTextDisclosure } from "@/components/AuxTextDisclosure";
 import { CopyIcon, PinIcon } from "@/content/overlay/icons";
-import type { ExtractedEvent, SummarySource } from "@/shared_types";
+import type { ExtractedEvent, Size, SummarySource } from "@/shared_types";
 import { createNotifications, ToastHost } from "@/ui/toast";
 
 export type OverlayViewModel = {
@@ -133,7 +133,7 @@ type OverlayNotify = ReturnType<typeof createNotifications>["notify"];
 type StateSetter<T> = React.Dispatch<React.SetStateAction<T>>;
 
 type DragOffset = { x: number; y: number };
-type PanelSize = { width: number; height: number };
+type PanelSize = Size;
 
 function getPanelSize(panel: HTMLDivElement | null): PanelSize {
   const rect = panel?.getBoundingClientRect();
