@@ -1366,6 +1366,79 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
   color: var(--text);
 }
 
+.mbu-switch-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--color-text) 4%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.mbu-switch-text {
+  color: inherit;
+  font-weight: 500;
+}
+
+.mbu-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 44px;
+  height: 24px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--color-text) 8%, transparent);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mbu-switch[data-checked] {
+  background: color-mix(
+    in oklab,
+    var(--color-primary) var(--accent-mix-18),
+    transparent
+  );
+  border-color: color-mix(
+    in oklab,
+    var(--color-primary) var(--accent-mix-40),
+    var(--line)
+  );
+}
+
+.mbu-switch[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mbu-switch[data-focused] {
+  box-shadow: 0 0 0 2px
+    color-mix(in oklab, var(--color-primary) 35%, transparent);
+}
+
+.mbu-switch-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transform: translateX(0);
+  transition: transform 160ms ease;
+}
+
+.mbu-switch[data-checked] .mbu-switch-thumb {
+  transform: translateX(22px);
+}
+
 .pattern-list {
   max-height: 240px;
   border: 1px dashed var(--line);

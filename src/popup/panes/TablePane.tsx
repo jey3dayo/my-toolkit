@@ -2,9 +2,9 @@ import { Button } from "@base-ui/react/button";
 import { Form } from "@base-ui/react/form";
 import { Input } from "@base-ui/react/input";
 import { ScrollArea } from "@base-ui/react/scroll-area";
-import { Toggle } from "@base-ui/react/toggle";
+import { Switch } from "@base-ui/react/switch";
 import { Result } from "@praha/byethrow";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { PopupPaneBaseProps } from "@/popup/panes/types";
 import type { EnableTableSortMessage } from "@/popup/runtime";
 
@@ -24,6 +24,7 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
   const [autoEnable, setAutoEnable] = useState(false);
   const [patterns, setPatterns] = useState<string[]>([]);
   const [patternInput, setPatternInput] = useState("");
+  const autoEnableLabelId = useId();
 
   useEffect(() => {
     let cancelled = false;
@@ -139,19 +140,24 @@ export function TablePane(props: TablePaneProps): React.JSX.Element {
         </Button>
       </div>
 
-      <Toggle
-        className="mbu-toggle-inline"
-        data-testid="auto-enable-sort"
-        onPressedChange={(pressed) => {
-          toggleAutoEnable(pressed).catch(() => {
-            // no-op
-          });
-        }}
-        pressed={autoEnable}
-        type="button"
-      >
-        自動で有効化する
-      </Toggle>
+      <div className="mbu-switch-field">
+        <span className="mbu-switch-text" id={autoEnableLabelId}>
+          自動で有効化する
+        </span>
+        <Switch.Root
+          aria-labelledby={autoEnableLabelId}
+          checked={autoEnable}
+          className="mbu-switch"
+          data-testid="auto-enable-sort"
+          onCheckedChange={(checked) => {
+            toggleAutoEnable(checked).catch(() => {
+              // no-op
+            });
+          }}
+        >
+          <Switch.Thumb className="mbu-switch-thumb" />
+        </Switch.Root>
+      </div>
 
       <div className="stack">
         <div className="hint">
