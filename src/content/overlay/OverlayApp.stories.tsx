@@ -30,6 +30,8 @@ const LONG_PRIMARY_TEXT = [
   ...Array.from({ length: 18 }, (_, i) => `追加行 ${i + 1}: ダミーテキスト`),
 ].join("\n");
 
+const COMPONENTS_CSS_PATH = "src/styles/tokens/components.css";
+
 type OverlayStoryArgs = {
   status: OverlayViewModel["status"];
   mode: OverlayViewModel["mode"];
@@ -111,6 +113,110 @@ function OverlayAppStory(args: OverlayStoryArgs): React.JSX.Element {
                 source: args.source,
                 title: args.title,
                 primary,
+                secondary: args.secondary,
+                anchorRect: null,
+              }}
+            />,
+            mount.root
+          )
+        : null}
+    </>
+  );
+}
+
+function ensureOverlayFallbackStyles(shadow: ShadowRoot): void {
+  if (shadow.querySelector("#mbu-ui-base-styles")) {
+    return;
+  }
+  const link = shadow.ownerDocument.createElement("link");
+  link.id = "mbu-ui-base-styles";
+  link.rel = "stylesheet";
+  link.href = COMPONENTS_CSS_PATH;
+  shadow.appendChild(link);
+}
+
+function OverlayAppFallbackStory(args: OverlayStoryArgs): React.JSX.Element {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [mount, setMount] = useState<{
+    shadow: ShadowRoot;
+    root: HTMLDivElement;
+  } | null>(null);
+  const removedLinksRef = useRef<HTMLLinkElement[]>([]);
+
+  const docTheme = document.documentElement.getAttribute("data-theme");
+  const resolvedTheme: Theme = isTheme(docTheme) ? docTheme : "auto";
+
+  useLayoutEffect(() => {
+    const tokenLinks = Array.from(
+      document.querySelectorAll<HTMLLinkElement>(
+        "#mbu-ui-token-primitives, #mbu-ui-token-semantic, #mbu-ui-base-styles"
+      )
+    );
+    removedLinksRef.current = tokenLinks;
+    for (const link of tokenLinks) {
+      link.remove();
+    }
+
+    const host = hostRef.current;
+    if (!host) {
+      return;
+    }
+
+    host.id = "my-browser-utils-overlay-fallback";
+    host.style.position = "fixed";
+    host.style.top = "16px";
+    host.style.left = "16px";
+    host.style.zIndex = "2147483647";
+
+    const shadow = host.shadowRoot ?? host.attachShadow({ mode: "open" });
+    ensureOverlayFallbackStyles(shadow);
+
+    const root = shadow.getElementById("my-browser-utils-overlay-root");
+    const rootEl = root
+      ? (root as HTMLDivElement)
+      : document.createElement("div");
+    rootEl.id = "my-browser-utils-overlay-root";
+    if (!root) {
+      shadow.appendChild(rootEl);
+    }
+
+    setMount({ shadow, root: rootEl });
+
+    return () => {
+      for (const link of removedLinksRef.current) {
+        document.head.appendChild(link);
+      }
+      removedLinksRef.current = [];
+      setMount(null);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!mount) {
+      return;
+    }
+
+    applyTheme(resolvedTheme, mount.shadow);
+  }, [mount, resolvedTheme]);
+
+  const host = hostRef.current;
+
+  return (
+    <>
+      <div ref={hostRef} />
+      {mount && host
+        ? createPortal(
+            <OverlayApp
+              host={host}
+              onDismiss={fn()}
+              portalContainer={mount.shadow}
+              viewModel={{
+                open: true,
+                status: args.status,
+                mode: args.mode,
+                source: args.source,
+                title: args.title,
+                primary: args.primary,
                 secondary: args.secondary,
                 anchorRect: null,
               }}
@@ -306,6 +412,56 @@ export const ReadyStylesApplied: Story = {
       expect(styles.display).toBe("grid");
       expect(styles.borderTopStyle).toBe("solid");
       expect(styles.borderTopWidth).toBe("1px");
+    });
+  },
+};
+
+export const ReadyStylesFallbackApplied: Story = {
+  args: {
+    status: "ready",
+    mode: "text",
+    source: "selection",
+    title: "要約",
+    primary: "要約結果（storybook）",
+    secondary: "選択範囲:\n引用テキスト",
+  },
+  render: (args) => <OverlayAppFallbackStory {...args} />,
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      const host = canvasElement.querySelector<HTMLDivElement>(
+        "#my-browser-utils-overlay-fallback"
+      );
+      const shadow = host?.shadowRoot ?? null;
+      expect(host).toBeTruthy();
+      expect(shadow).toBeTruthy();
+      expect(shadow?.querySelector(".mbu-overlay-panel")).toBeTruthy();
+    });
+
+    const host = canvasElement.querySelector<HTMLDivElement>(
+      "#my-browser-utils-overlay-fallback"
+    );
+    const shadow = host?.shadowRoot ?? null;
+    const panel = shadow?.querySelector<HTMLElement>(".mbu-overlay-panel");
+
+    if (!(host && shadow && panel)) {
+      throw new Error("overlay host/shadow/panel not mounted");
+    }
+
+    await waitFor(() => {
+      expect(
+        getComputedStyle(host).getPropertyValue("--primitive-space-7").trim()
+      ).toBe("");
+    });
+
+    await waitFor(() => {
+      expect(
+        getComputedStyle(host).getPropertyValue("--mbu-surface").trim()
+      ).not.toBe("");
+    });
+
+    await waitFor(() => {
+      const styles = getComputedStyle(panel);
+      expect(styles.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
     });
   },
 };
