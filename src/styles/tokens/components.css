@@ -261,7 +261,7 @@
 .mbu-toast-viewport[data-placement="surface"] {
   position: absolute;
   inset: var(--toast-surface-inset, 12px 12px auto auto);
-  align-items: center;
+  align-items: flex-end;
 }
 
 .mbu-toast-viewport[data-placement="surface"] .mbu-toast-root {
