@@ -16,6 +16,8 @@ const iconNames: IconName[] = [
   "pin",
   "copy",
   "close",
+  "eye",
+  "eye-off",
 ];
 
 function IconGallery(): React.JSX.Element {

@@ -1270,6 +1270,49 @@ body.no-js:has(.pane:target) .pane.active:not(:target) {
   font-size: var(--primitive-font-size-14);
 }
 
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.token-input--with-icon {
+  padding-right: 40px;
+}
+
+.input-icon-toggle {
+  position: absolute;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-sub);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.input-icon-toggle:hover {
+  background: color-mix(in oklab, var(--color-text) 6%, transparent);
+}
+
+.input-icon-toggle[data-pressed] {
+  color: var(--text);
+  border-color: color-mix(in oklab, var(--color-primary) 35%, var(--line));
+  background: color-mix(
+    in oklab,
+    var(--color-primary) var(--accent-mix-14),
+    transparent
+  );
+}
+
+.input-icon-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
 .mbu-select-trigger {
   width: 100%;
   display: flex;

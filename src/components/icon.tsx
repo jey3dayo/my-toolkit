@@ -1,6 +1,8 @@
 import {
   Calendar,
   Copy,
+  Eye,
+  EyeOff,
   Link,
   type LucideProps,
   Menu,
@@ -18,6 +20,8 @@ export type IconName =
   | "calendar"
   | "close"
   | "copy"
+  | "eye"
+  | "eye-off"
   | "link"
   | "menu"
   | "monitor"
@@ -32,6 +36,8 @@ const icons: Record<IconName, React.ComponentType<LucideProps>> = {
   calendar: Calendar,
   close: X,
   copy: Copy,
+  eye: Eye,
+  "eye-off": EyeOff,
   link: Link,
   menu: Menu,
   monitor: Monitor,

@@ -10,6 +10,7 @@ import { Separator } from "@base-ui/react/separator";
 import { Toggle } from "@base-ui/react/toggle";
 import { Result } from "@praha/byethrow";
 import { useEffect, useId, useState } from "react";
+import { Icon } from "@/components/icon";
 import {
   DEFAULT_OPENAI_MODEL,
   normalizeOpenAiModel,
@@ -427,26 +428,34 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
 
           <label className="field" htmlFor={tokenInputId}>
             <span className="field-name">トークン</span>
-            <Input
-              className="token-input"
-              data-testid="openai-token"
-              id={tokenInputId}
-              onValueChange={setToken}
-              ref={props.tokenInputRef}
-              type={showToken ? "text" : "password"}
-              value={token}
-            />
+            <div className="input-with-icon">
+              <Input
+                className="token-input token-input--with-icon"
+                data-testid="openai-token"
+                id={tokenInputId}
+                onValueChange={setToken}
+                ref={props.tokenInputRef}
+                type={showToken ? "text" : "password"}
+                value={token}
+              />
+              <Toggle
+                aria-controls={tokenInputId}
+                aria-label={showToken ? "トークンを隠す" : "トークンを表示する"}
+                className="input-icon-toggle"
+                data-testid="token-visible"
+                onPressedChange={setShowToken}
+                pressed={showToken}
+                title={showToken ? "トークンを隠す" : "トークンを表示する"}
+                type="button"
+              >
+                <Icon
+                  aria-hidden="true"
+                  name={showToken ? "eye-off" : "eye"}
+                  size={16}
+                />
+              </Toggle>
+            </div>
           </label>
-
-          <Toggle
-            className="mbu-toggle"
-            data-testid="token-visible"
-            onPressedChange={setShowToken}
-            pressed={showToken}
-            type="button"
-          >
-            表示する
-          </Toggle>
         </Fieldset.Root>
 
         <div className="button-row">
