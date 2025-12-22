@@ -1,16 +1,17 @@
-export const SUMMARIZE_PROMPT = [
-  "次のテキストを日本語で要約してください。",
-  "",
-  "要件:",
-  "- 重要ポイントを箇条書き(3〜7個)",
-  "- 最後に一文で結論/要約",
-  "- 事実と推測を混同しない",
-  "",
-  "{{text}}",
-].join("\n");
+import { parse } from "smol-toml";
+import promptToml from "@/prompts/context_actions.toml";
 
-export const TRANSLATE_JA_PROMPT = [
-  "次のテキストを自然な日本語に翻訳してください。",
-  "",
-  "{{text}}",
-].join("\n");
+function getTomlString(source: string, key: string): string {
+  const parsed = parse(source) as Record<string, unknown>;
+  const value = parsed[key];
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.replace(/\r\n?/g, "\n");
+}
+
+export const SUMMARIZE_PROMPT = getTomlString(promptToml, "summarize_prompt");
+export const TRANSLATE_JA_PROMPT = getTomlString(
+  promptToml,
+  "translate_ja_prompt"
+);
