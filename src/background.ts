@@ -1283,7 +1283,7 @@ async function testOpenAiToken(
 
   const checkResult = await fetchOpenAiChatCompletionOk(fetch, token.value, {
     model: await loadOpenAiModel(storageLocalGetTyped),
-    max_tokens: 5,
+    max_completion_tokens: 5,
     temperature: 0,
     messages: [
       { role: "system", content: "You are a health check bot." },
