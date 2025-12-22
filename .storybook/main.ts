@@ -9,16 +9,14 @@ const dirname =
     ? __dirname
     : path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(dirname, "../src");
-const stripQuery = (id: string) => id.split("?", 1)[0];
 const tomlAsText = (): Plugin => ({
   name: "toml-as-text",
   enforce: "pre",
   load(id: string) {
-    const cleanId = stripQuery(id);
-    if (!cleanId.endsWith(".toml")) {
+    if (!id.endsWith(".toml")) {
       return null;
     }
-    const code = fs.readFileSync(cleanId, "utf8");
+    const code = fs.readFileSync(id, "utf8");
     return {
       code: `export default ${JSON.stringify(code)};`,
       map: null,
@@ -39,8 +37,13 @@ const config: StorybookConfig = {
     { from: "../images", to: "/images" },
   ],
   viteFinal(viteConfig) {
-    const plugins = Array.isArray(viteConfig.plugins) ? viteConfig.plugins : [];
-    viteConfig.plugins = [tomlAsText(), ...plugins];
+    const plugins: Plugin[] = [];
+    if (Array.isArray(viteConfig.plugins)) {
+      plugins.push(...viteConfig.plugins);
+    } else if (viteConfig.plugins) {
+      plugins.push(viteConfig.plugins);
+    }
+    viteConfig.plugins = [...plugins, tomlAsText()];
 
     viteConfig.resolve ??= {};
     const alias = viteConfig.resolve.alias;
