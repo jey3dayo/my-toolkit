@@ -61,6 +61,12 @@
   --color-primary: var(--primitive-color-green-500);
   --color-primary-2: var(--primitive-color-cyan-300);
   --color-danger: var(--primitive-color-red-400);
+  --accent-mix-8: 18%;
+  --accent-mix-12: 24%;
+  --accent-mix-14: 26%;
+  --accent-mix-15: 26%;
+  --accent-mix-18: 30%;
+  --accent-mix-22: 34%;
 
   --shadow-elevation: var(--primitive-shadow-dark);
   --focus-ring: 2px solid rgba(123, 220, 247, 0.55);
@@ -84,6 +90,12 @@
   --color-primary: var(--primitive-color-green-500);
   --color-primary-2: var(--primitive-color-cyan-300);
   --color-danger: var(--primitive-color-red-400);
+  --accent-mix-8: 18%;
+  --accent-mix-12: 24%;
+  --accent-mix-14: 26%;
+  --accent-mix-15: 26%;
+  --accent-mix-18: 30%;
+  --accent-mix-22: 34%;
 
   --shadow-elevation: var(--primitive-shadow-dark);
   --focus-ring: 2px solid rgba(123, 220, 247, 0.55);
@@ -106,6 +118,12 @@
   --color-primary: var(--primitive-color-blue-500);
   --color-primary-2: var(--primitive-color-cyan-300);
   --color-danger: var(--primitive-color-red-600);
+  --accent-mix-8: 8%;
+  --accent-mix-12: 12%;
+  --accent-mix-14: 14%;
+  --accent-mix-15: 15%;
+  --accent-mix-18: 18%;
+  --accent-mix-22: 22%;
 
   --shadow-elevation: var(--primitive-shadow-light);
   --focus-ring: 2px solid rgba(66, 133, 244, 0.65);
@@ -128,6 +146,12 @@
   --color-primary: var(--primitive-color-blue-500);
   --color-primary-2: var(--primitive-color-cyan-300);
   --color-danger: var(--primitive-color-red-600);
+  --accent-mix-8: 8%;
+  --accent-mix-12: 12%;
+  --accent-mix-14: 14%;
+  --accent-mix-15: 15%;
+  --accent-mix-18: 18%;
+  --accent-mix-22: 22%;
 
   --shadow-elevation: var(--primitive-shadow-light);
   --focus-ring: 2px solid rgba(66, 133, 244, 0.65);
@@ -151,6 +175,12 @@
     --color-primary: var(--primitive-color-blue-500);
     --color-primary-2: var(--primitive-color-cyan-300);
     --color-danger: var(--primitive-color-red-600);
+    --accent-mix-8: 8%;
+    --accent-mix-12: 12%;
+    --accent-mix-14: 14%;
+    --accent-mix-15: 15%;
+    --accent-mix-18: 18%;
+    --accent-mix-22: 22%;
 
     --shadow-elevation: var(--primitive-shadow-light);
     --focus-ring: 2px solid rgba(66, 133, 244, 0.65);
@@ -173,6 +203,12 @@
     --color-primary: var(--primitive-color-blue-500);
     --color-primary-2: var(--primitive-color-cyan-300);
     --color-danger: var(--primitive-color-red-600);
+    --accent-mix-8: 8%;
+    --accent-mix-12: 12%;
+    --accent-mix-14: 14%;
+    --accent-mix-15: 15%;
+    --accent-mix-18: 18%;
+    --accent-mix-22: 22%;
 
     --shadow-elevation: var(--primitive-shadow-light);
     --focus-ring: 2px solid rgba(66, 133, 244, 0.65);
