@@ -75,7 +75,7 @@ function OverlayToastPlacementStory(): React.JSX.Element {
 }
 
 const meta = {
-  title: "Content/OverlayToastPlacement",
+  title: "Content/Overlay/Toast/Placement",
   component: OverlayToastPlacementStory,
   tags: ["test"],
 } satisfies Meta<typeof OverlayToastPlacementStory>;

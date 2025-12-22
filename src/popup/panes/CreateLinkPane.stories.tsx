@@ -10,7 +10,7 @@ function CreateLinkPaneStory(props: PopupPaneBaseProps): React.JSX.Element {
 }
 
 const meta = {
-  title: "Popup/CreateLinkPane",
+  title: "Popup/Panes/CreateLink",
   component: CreateLinkPaneStory,
   tags: ["test"],
   argTypes: {

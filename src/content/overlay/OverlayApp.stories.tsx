@@ -32,7 +32,7 @@ const PROMPT_PRIMARY_TEXT = [
 ].join("\n");
 
 const meta = {
-  title: "Content/OverlayApp/要約・プロンプト実行モード",
+  title: "Content/Overlay/App/要約・プロンプト",
   component: OverlayAppStory,
   tags: ["test"],
   argTypes: {

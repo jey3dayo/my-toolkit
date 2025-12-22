@@ -18,7 +18,7 @@ function SettingsPaneStory(props: PopupPaneBaseProps): React.JSX.Element {
 }
 
 const meta = {
-  title: "Popup/SettingsPane",
+  title: "Popup/Panes/Settings",
   component: SettingsPaneStory,
   tags: ["test"],
   argTypes: {

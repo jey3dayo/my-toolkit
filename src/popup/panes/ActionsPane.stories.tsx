@@ -10,7 +10,7 @@ function ActionsPaneStory(props: ActionsPaneProps): React.JSX.Element {
 }
 
 const meta = {
-  title: "Popup/ActionsPane",
+  title: "Popup/Panes/Actions",
   component: ActionsPaneStory,
   tags: ["test"],
   argTypes: {

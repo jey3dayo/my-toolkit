@@ -10,7 +10,7 @@ function AuxTextDisclosureStory(props: Props): React.JSX.Element | null {
 }
 
 const meta = {
-  title: "Components/AuxTextDisclosure",
+  title: "Shared/Components/AuxTextDisclosure",
   component: AuxTextDisclosureStory,
   tags: ["test"],
 } satisfies Meta<typeof AuxTextDisclosureStory>;

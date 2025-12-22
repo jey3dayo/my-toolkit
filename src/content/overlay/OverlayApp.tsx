@@ -511,7 +511,7 @@ function OverlayEventDetails(
   );
 }
 
-type OverlayTextDetailsProps = {
+type OverlayTextContentProps = {
   mode: OverlayViewModel["mode"];
   statusLabel: string;
   canCopyPrimary: boolean;
@@ -520,6 +520,8 @@ type OverlayTextDetailsProps = {
   selectionText: string;
   onCopyPrimary: () => void;
 };
+
+type OverlayTextDetailsProps = OverlayTextContentProps;
 
 function OverlayTextDetails(props: OverlayTextDetailsProps): React.JSX.Element {
   return (
@@ -548,17 +550,10 @@ function OverlayTextDetails(props: OverlayTextDetailsProps): React.JSX.Element {
   );
 }
 
-type OverlayBodyProps = {
-  mode: OverlayViewModel["mode"];
-  primary: string;
+type OverlayBodyProps = OverlayTextContentProps & {
   readyEvent: ExtractedEvent | null;
   canOpenCalendar: boolean;
   canDownloadIcs: boolean;
-  canCopyPrimary: boolean;
-  statusLabel: string;
-  selectionText: string;
-  secondaryText: string;
-  onCopyPrimary: () => void;
   onOpenCalendar: () => void;
   onDownloadIcs: () => void;
 };

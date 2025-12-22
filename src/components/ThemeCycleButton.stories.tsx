@@ -21,7 +21,7 @@ function ThemeCycleButtonStory(): React.JSX.Element {
 }
 
 const meta = {
-  title: "Components/ThemeCycleButton",
+  title: "Shared/Components/ThemeCycleButton",
   component: ThemeCycleButtonStory,
   tags: ["test"],
 } satisfies Meta<typeof ThemeCycleButtonStory>;

@@ -81,7 +81,7 @@ function ToastStory(): React.JSX.Element {
 }
 
 const meta = {
-  title: "UI/Toast",
+  title: "Shared/UI/Toast",
   component: ToastStory,
   tags: ["test"],
 } satisfies Meta<typeof ToastStory>;

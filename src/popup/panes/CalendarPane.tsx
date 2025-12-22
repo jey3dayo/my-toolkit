@@ -10,6 +10,7 @@ import type {
 } from "@/popup/runtime";
 import { ensureOpenAiTokenConfigured } from "@/popup/token_guard";
 import { coerceSummarySourceLabel } from "@/popup/utils/summary_source_label";
+import { fetchSummaryTargetForActiveTab } from "@/popup/utils/summary_target";
 import type {
   CalendarRegistrationTarget,
   ExtractedEvent,
@@ -153,29 +154,6 @@ export function CalendarPane(props: CalendarPaneProps): React.JSX.Element {
     return true;
   };
 
-  const fetchSummaryTarget = async (): Promise<SummaryTarget | null> => {
-    const tabIdResult = await props.runtime.getActiveTabId();
-    if (Result.isFailure(tabIdResult)) {
-      reportError(tabIdResult.error);
-      return null;
-    }
-    if (tabIdResult.value === null) {
-      reportError("有効なタブが見つかりません");
-      return null;
-    }
-
-    const targetResult = await props.runtime.sendMessageToTab<
-      { action: "getSummaryTargetText" },
-      SummaryTarget
-    >(tabIdResult.value, { action: "getSummaryTargetText" });
-    if (Result.isFailure(targetResult)) {
-      reportError(targetResult.error);
-      return null;
-    }
-
-    return targetResult.value;
-  };
-
   const requestEventSummary = async (
     target: SummaryTarget
   ): Promise<SummarizeEventSuccess | null> => {
@@ -207,7 +185,10 @@ export function CalendarPane(props: CalendarPaneProps): React.JSX.Element {
 
     setOutput({ status: "running" });
 
-    const target = await fetchSummaryTarget();
+    const target = await fetchSummaryTargetForActiveTab({
+      runtime: props.runtime,
+      onError: reportError,
+    });
     if (!target) {
       return;
     }

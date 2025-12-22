@@ -10,7 +10,7 @@ function TablePaneStory(props: PopupPaneBaseProps): React.JSX.Element {
 }
 
 const meta = {
-  title: "Popup/TablePane",
+  title: "Popup/Panes/Table",
   component: TablePaneStory,
   tags: ["test"],
   argTypes: {

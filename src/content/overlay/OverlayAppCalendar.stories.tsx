@@ -33,7 +33,7 @@ const CALENDAR_ICS = [
 ].join("\n");
 
 const meta = {
-  title: "Content/OverlayApp/カレンダー登録",
+  title: "Content/Overlay/App/カレンダー",
   component: OverlayAppStory,
   tags: ["test"],
   argTypes: {

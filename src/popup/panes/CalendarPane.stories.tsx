@@ -13,7 +13,7 @@ function CalendarPaneStory(props: CalendarPaneProps): React.JSX.Element {
 }
 
 const meta = {
-  title: "Popup/CalendarPane",
+  title: "Popup/Panes/Calendar",
   component: CalendarPaneStory,
   tags: ["test"],
   argTypes: {
