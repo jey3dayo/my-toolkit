@@ -1,4 +1,8 @@
 import { CODE_REVIEW_PROMPT } from "@/context_action_prompts";
+import {
+  SUMMARIZE_PROMPT,
+  TRANSLATE_JA_PROMPT,
+} from "@/prompts/context_actions";
 import { isRecord } from "@/utils/guards";
 
 export type ContextActionKind = "text" | "event";
@@ -15,26 +19,13 @@ export const DEFAULT_CONTEXT_ACTIONS: ContextAction[] = [
     id: "builtin:summarize",
     title: "要約",
     kind: "text",
-    prompt: [
-      "次のテキストを日本語で要約してください。",
-      "",
-      "要件:",
-      "- 重要ポイントを箇条書き(3〜7個)",
-      "- 最後に一文で結論/要約",
-      "- 事実と推測を混同しない",
-      "",
-      "{{text}}",
-    ].join("\n"),
+    prompt: SUMMARIZE_PROMPT,
   },
   {
     id: "builtin:translate-ja",
     title: "日本語に翻訳",
     kind: "text",
-    prompt: [
-      "次のテキストを自然な日本語に翻訳してください。",
-      "",
-      "{{text}}",
-    ].join("\n"),
+    prompt: TRANSLATE_JA_PROMPT,
   },
   {
     id: "builtin:code-review",
