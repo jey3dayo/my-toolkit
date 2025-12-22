@@ -224,7 +224,7 @@ export function PopupApp(): React.JSX.Element {
 
   useEffect(() => {
     document.title = APP_NAME;
-  }, [APP_NAME]);
+  }, []);
 
   useEffect(() => {
     document.body.classList.toggle("menu-open", menuOpen);

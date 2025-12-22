@@ -286,7 +286,7 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
             モデル
           </Fieldset.Legend>
 
-          <label className="field">
+          <div className="field">
             <span className="field-name">モデル</span>
             <Select.Root
               name="openaiModel"
@@ -330,7 +330,7 @@ export function SettingsPane(props: SettingsPaneProps): React.JSX.Element {
                 </Select.Positioner>
               </Select.Portal>
             </Select.Root>
-          </label>
+          </div>
         </Fieldset.Root>
 
         <div className="button-row">

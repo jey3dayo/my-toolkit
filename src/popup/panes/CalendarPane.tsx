@@ -36,6 +36,8 @@ type OutputState =
     }
   | { status: "error"; message: string };
 
+type SummarizeEventSuccess = Extract<SummarizeEventResponse, { ok: true }>;
+
 function coerceSourceLabel(
   source: SummaryTarget["source"] | undefined
 ): string {
@@ -149,9 +151,62 @@ export function CalendarPane(props: CalendarPaneProps): React.JSX.Element {
     return !Result.isFailure(tokenConfigured);
   };
 
-  const runCalendar = async (): Promise<void> => {
+  const reportError = (message: string): void => {
+    props.notify.error(message);
+    setOutput({ status: "idle" });
+  };
+
+  const ensureTargetsSelected = (): boolean => {
     if (targets.length === 0) {
       props.notify.error("登録先を1つ以上選択してください");
+      return false;
+    }
+    return true;
+  };
+
+  const fetchSummaryTarget = async (): Promise<SummaryTarget | null> => {
+    const tabIdResult = await props.runtime.getActiveTabId();
+    if (Result.isFailure(tabIdResult)) {
+      reportError(tabIdResult.error);
+      return null;
+    }
+    if (tabIdResult.value === null) {
+      reportError("有効なタブが見つかりません");
+      return null;
+    }
+
+    const targetResult = await props.runtime.sendMessageToTab<
+      { action: "getSummaryTargetText" },
+      SummaryTarget
+    >(tabIdResult.value, { action: "getSummaryTargetText" });
+    if (Result.isFailure(targetResult)) {
+      reportError(targetResult.error);
+      return null;
+    }
+
+    return targetResult.value;
+  };
+
+  const requestEventSummary = async (
+    target: SummaryTarget
+  ): Promise<SummarizeEventSuccess | null> => {
+    const response = await props.runtime.sendMessageToBackground<
+      SummarizeEventRequest,
+      SummarizeEventResponse
+    >({ action: "summarizeEvent", target });
+    if (Result.isFailure(response)) {
+      reportError(response.error);
+      return null;
+    }
+    if (!response.value.ok) {
+      reportError(response.value.error);
+      return null;
+    }
+    return response.value;
+  };
+
+  const runCalendar = async (): Promise<void> => {
+    if (!ensureTargetsSelected()) {
       return;
     }
 
@@ -163,43 +218,13 @@ export function CalendarPane(props: CalendarPaneProps): React.JSX.Element {
 
     setOutput({ status: "running" });
 
-    const tabIdResult = await props.runtime.getActiveTabId();
-    if (Result.isFailure(tabIdResult)) {
-      props.notify.error(tabIdResult.error);
-      setOutput({ status: "idle" });
-      return;
-    }
-    const tabId = tabIdResult.value;
-    if (tabId === null) {
-      props.notify.error("有効なタブが見つかりません");
-      setOutput({ status: "idle" });
+    const target = await fetchSummaryTarget();
+    if (!target) {
       return;
     }
 
-    const targetResult = await props.runtime.sendMessageToTab<
-      { action: "getSummaryTargetText" },
-      SummaryTarget
-    >(tabId, { action: "getSummaryTargetText" });
-    if (Result.isFailure(targetResult)) {
-      props.notify.error(targetResult.error);
-      setOutput({ status: "idle" });
-      return;
-    }
-
-    const response = await props.runtime.sendMessageToBackground<
-      SummarizeEventRequest,
-      SummarizeEventResponse
-    >({ action: "summarizeEvent", target: targetResult.value });
-    if (Result.isFailure(response)) {
-      props.notify.error(response.error);
-      setOutput({ status: "idle" });
-      return;
-    }
-
-    const payload = response.value;
-    if (!payload.ok) {
-      props.notify.error(payload.error);
-      setOutput({ status: "idle" });
+    const payload = await requestEventSummary(target);
+    if (!payload) {
       return;
     }
 
@@ -215,7 +240,7 @@ export function CalendarPane(props: CalendarPaneProps): React.JSX.Element {
     setOutput({
       status: "ready",
       text: payload.eventText,
-      sourceLabel: coerceSourceLabel(targetResult.value.source),
+      sourceLabel: coerceSourceLabel(target.source),
       calendarUrl,
       event: payload.event,
     });
