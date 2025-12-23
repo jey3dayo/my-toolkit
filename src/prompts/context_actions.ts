@@ -15,3 +15,7 @@ export const TRANSLATE_JA_PROMPT = getTomlString(
   promptToml,
   "translate_ja_prompt"
 );
+export const CODE_REVIEW_PROMPT = getTomlString(
+  promptToml,
+  "code_review_prompt"
+);

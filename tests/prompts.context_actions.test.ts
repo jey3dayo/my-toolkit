@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { CODE_REVIEW_PROMPT } from "@/context_action_prompts";
 import { DEFAULT_CONTEXT_ACTIONS } from "@/context_actions";
 import {
+  CODE_REVIEW_PROMPT,
   SUMMARIZE_PROMPT,
   TRANSLATE_JA_PROMPT,
 } from "@/prompts/context_actions";

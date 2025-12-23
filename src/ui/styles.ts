@@ -190,13 +190,16 @@ export function ensureShadowUiBaseStyles(shadowRoot: ShadowRoot): void {
       return true;
     }
     const host = shadowRoot.host;
-    if (host instanceof HTMLElement && host.isConnected) {
-      const value = getComputedStyle(host)
-        .getPropertyValue("--mbu-surface")
-        .trim();
-      return value.length > 0;
+    if (!(host instanceof HTMLElement)) {
+      return true;
     }
-    return true;
+    if (!host.isConnected) {
+      return true;
+    }
+    const value = getComputedStyle(host)
+      .getPropertyValue("--mbu-surface")
+      .trim();
+    return value.length > 0;
   };
   if (
     shadowConstructedSheets &&
