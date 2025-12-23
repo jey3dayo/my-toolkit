@@ -59,10 +59,10 @@ const SOURCE_SUFFIX_REGEX = /（(?:選択範囲|ページ本文)）\s*$/;
     url: string;
   };
 
-  const OVERLAY_HOST_ID = "my-toolkit-overlay";
+  const OVERLAY_HOST_ID = "browser-toolkit-overlay";
   const OVERLAY_ROOT_ID = "mtk-overlay-react-root";
 
-  const TOAST_HOST_ID = "my-toolkit-toast-host";
+  const TOAST_HOST_ID = "browser-toolkit-toast-host";
   const TOAST_ROOT_ID = "mtk-toast-react-root";
 
   type OverlayMount = {

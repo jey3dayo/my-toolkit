@@ -1,4 +1,4 @@
-# Tech Steering: My Toolkit
+# Tech Steering: Browser Toolkit
 
 ## Platform
 

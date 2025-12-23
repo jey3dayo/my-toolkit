@@ -267,7 +267,7 @@ The overlay remains Shadow DOM-mounted for CSS isolation. (9)
 
 Design contract:
 
-- One host element (stable id, e.g., `my-toolkit-overlay`) exists at most once.
+- One host element (stable id, e.g., `browser-toolkit-overlay`) exists at most once.
 - One React root exists at most once per page.
 - A global guard (host id + an attached property on the host or a `globalThis` symbol) prevents double-mount. (9, 12)
 

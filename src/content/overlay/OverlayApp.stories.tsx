@@ -75,14 +75,14 @@ export const Loading: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() => {
       const host = canvasElement.querySelector<HTMLDivElement>(
-        "#my-toolkit-overlay"
+        "#browser-toolkit-overlay"
       );
       expect(host).toBeTruthy();
       expect(host?.shadowRoot).toBeTruthy();
     });
 
     const host = canvasElement.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     expect(shadow).not.toBeNull();
@@ -103,7 +103,7 @@ export const Ready: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() => {
       const host = canvasElement.querySelector<HTMLDivElement>(
-        "#my-toolkit-overlay"
+        "#browser-toolkit-overlay"
       );
       const shadow = host?.shadowRoot ?? null;
       expect(
@@ -112,7 +112,7 @@ export const Ready: Story = {
     });
 
     const host = canvasElement.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     const copyButton = shadow?.querySelector<HTMLElement>(
@@ -143,7 +143,7 @@ export const PromptReady: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() => {
       const host = canvasElement.querySelector<HTMLDivElement>(
-        "#my-toolkit-overlay"
+        "#browser-toolkit-overlay"
       );
       const shadow = host?.shadowRoot ?? null;
       expect(
@@ -152,7 +152,7 @@ export const PromptReady: Story = {
     });
 
     const host = canvasElement.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     const title = shadow?.querySelector(".mbu-overlay-title");
@@ -180,7 +180,7 @@ export const ThemeToggle: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() => {
       const host = canvasElement.querySelector<HTMLDivElement>(
-        "#my-toolkit-overlay"
+        "#browser-toolkit-overlay"
       );
       const shadow = host?.shadowRoot ?? null;
       expect(
@@ -189,7 +189,7 @@ export const ThemeToggle: Story = {
     });
 
     const host = canvasElement.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     const themeButton = shadow?.querySelector<HTMLButtonElement>(
@@ -230,7 +230,7 @@ export const MarkdownToggle: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() => {
       const host = canvasElement.querySelector<HTMLDivElement>(
-        "#my-toolkit-overlay"
+        "#browser-toolkit-overlay"
       );
       const shadow = host?.shadowRoot ?? null;
       expect(
@@ -239,7 +239,7 @@ export const MarkdownToggle: Story = {
     });
 
     const host = canvasElement.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     const markdownButton = shadow?.querySelector<HTMLButtonElement>(
@@ -281,7 +281,7 @@ export const ReadyLongText: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() => {
       const host = canvasElement.querySelector<HTMLDivElement>(
-        "#my-toolkit-overlay"
+        "#browser-toolkit-overlay"
       );
       const shadow = host?.shadowRoot ?? null;
       expect(
@@ -290,7 +290,7 @@ export const ReadyLongText: Story = {
     });
 
     const host = canvasElement.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     const panel = shadow?.querySelector<HTMLElement>(".mbu-overlay-panel");
@@ -329,7 +329,7 @@ export const ReadyStylesApplied: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() => {
       const host = canvasElement.querySelector<HTMLDivElement>(
-        "#my-toolkit-overlay"
+        "#browser-toolkit-overlay"
       );
       const shadow = host?.shadowRoot ?? null;
       expect(host).toBeTruthy();
@@ -338,7 +338,7 @@ export const ReadyStylesApplied: Story = {
     });
 
     const host = canvasElement.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     const panel = shadow?.querySelector<HTMLElement>(".mbu-overlay-panel");
@@ -381,7 +381,7 @@ export const ReadyStylesFallbackApplied: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() => {
       const host = canvasElement.querySelector<HTMLDivElement>(
-        "#my-toolkit-overlay-fallback"
+        "#browser-toolkit-overlay-fallback"
       );
       const shadow = host?.shadowRoot ?? null;
       expect(host).toBeTruthy();
@@ -390,7 +390,7 @@ export const ReadyStylesFallbackApplied: Story = {
     });
 
     const host = canvasElement.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay-fallback"
+      "#browser-toolkit-overlay-fallback"
     );
     const shadow = host?.shadowRoot ?? null;
     const panel = shadow?.querySelector<HTMLElement>(".mbu-overlay-panel");

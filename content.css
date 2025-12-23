@@ -29,18 +29,18 @@ table[data-sortable][data-sort-order="desc"] th:hover::after {
 }
 
 /* Overlay/Toast hosts (ShadowRoot containers) */
-#my-toolkit-overlay,
-#my-toolkit-toast-host {
+#browser-toolkit-overlay,
+#browser-toolkit-toast-host {
   position: fixed;
   z-index: 2147483647;
 }
 
-#my-toolkit-overlay {
+#browser-toolkit-overlay {
   top: 16px;
   left: 16px;
 }
 
-#my-toolkit-toast-host {
+#browser-toolkit-toast-host {
   top: 0;
   left: 0;
 }

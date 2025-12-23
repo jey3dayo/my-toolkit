@@ -1,4 +1,4 @@
-# My Toolkit
+# Browser Toolkit
 
 個人用のツールキット Chrome 拡張（Manifest V3）です。自分が欲しい機能（テーブルソート、AI問い合わせ、翻訳、レビューなど）を詰め込んだツール集です。
 
@@ -43,7 +43,7 @@
    - `pnpm run build`（`dist/` を生成）
 2. Chrome で `chrome://extensions/` を開く
 3. **デベロッパーモード** を有効化
-4. **パッケージ化されていない拡張機能を読み込む** をクリックし、`my-toolkit` フォルダを選択
+4. **パッケージ化されていない拡張機能を読み込む** をクリックし、`browser-toolkit` フォルダを選択
 
 ## 使い方
 
@@ -60,7 +60,7 @@
 ### Context Actions
 
 - ポップアップ（**アクション** タブ）から実行: 選択範囲 → 直近の選択キャッシュ（約30秒）→ ページ本文の順にフォールバックします
-- 右クリックから実行: 右クリックメニュー → **My Toolkit** → アクション
+- 右クリックから実行: 右クリックメニュー → **Browser Toolkit** → アクション
 
 ## 設定
 
@@ -98,7 +98,7 @@
 ## プロジェクト構成
 
 ```
-my-toolkit/
+browser-toolkit/
 ├── dist/                      # bundle 出力（生成物）
 ├── docs/                      # ドキュメント
 │   ├── context-actions.md     # Context Actions ガイド

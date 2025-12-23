@@ -94,7 +94,7 @@ describe("content overlay (React + Shadow DOM)", () => {
     }
 
     expect(
-      dom.window.document.querySelectorAll("#my-toolkit-overlay").length
+      dom.window.document.querySelectorAll("#browser-toolkit-overlay").length
     ).toBe(1);
 
     vi.resetModules();
@@ -105,7 +105,7 @@ describe("content overlay (React + Shadow DOM)", () => {
     }
 
     expect(
-      dom.window.document.querySelectorAll("#my-toolkit-overlay").length
+      dom.window.document.querySelectorAll("#browser-toolkit-overlay").length
     ).toBe(1);
   });
 
@@ -135,7 +135,7 @@ describe("content overlay (React + Shadow DOM)", () => {
     );
 
     const host = dom.window.document.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     expect(shadow).not.toBeNull();
@@ -153,7 +153,7 @@ describe("content overlay (React + Shadow DOM)", () => {
       shadow?.querySelector('[data-testid="overlay-copy"]')
     ).not.toBeNull();
     expect(
-      dom.window.document.querySelector("#my-toolkit-overlay")
+      dom.window.document.querySelector("#browser-toolkit-overlay")
     ).not.toBeNull();
   });
 
@@ -177,7 +177,7 @@ describe("content overlay (React + Shadow DOM)", () => {
     );
 
     const host = dom.window.document.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     expect(shadow).not.toBeNull();
@@ -207,7 +207,7 @@ describe("content overlay (React + Shadow DOM)", () => {
     );
 
     const host = dom.window.document.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     expect(shadow).not.toBeNull();
@@ -248,7 +248,7 @@ describe("content overlay (React + Shadow DOM)", () => {
     );
 
     const host = dom.window.document.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     expect(shadow).not.toBeNull();
@@ -290,7 +290,7 @@ describe("content overlay (React + Shadow DOM)", () => {
     );
 
     const host = dom.window.document.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     expect(shadow).not.toBeNull();
@@ -375,7 +375,7 @@ describe("content overlay (React + Shadow DOM)", () => {
     );
 
     const host = dom.window.document.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     expect(shadow).not.toBeNull();

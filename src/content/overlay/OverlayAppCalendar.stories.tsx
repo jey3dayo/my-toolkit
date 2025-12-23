@@ -71,14 +71,14 @@ export const CalendarReady: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() => {
       const host = canvasElement.querySelector<HTMLDivElement>(
-        "#my-toolkit-overlay"
+        "#browser-toolkit-overlay"
       );
       const shadow = host?.shadowRoot ?? null;
       expect(shadow?.querySelector(".mbu-overlay-event-table")).toBeTruthy();
     });
 
     const host = canvasElement.querySelector<HTMLDivElement>(
-      "#my-toolkit-overlay"
+      "#browser-toolkit-overlay"
     );
     const shadow = host?.shadowRoot ?? null;
     const bodyActions = shadow?.querySelector<HTMLElement>(
