@@ -4,6 +4,7 @@ import { Result } from "@praha/byethrow";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { APP_NAME } from "@/app_meta";
 import { Icon } from "@/components/icon";
+import { replaceHashSafely } from "@/popup/hash";
 import { coercePaneId, getPaneIdFromHash, type PaneId } from "@/popup/panes";
 import { ActionsPane } from "@/popup/panes/ActionsPane";
 import { CalendarPane } from "@/popup/panes/CalendarPane";
@@ -14,17 +15,6 @@ import { createPopupRuntime } from "@/popup/runtime";
 import type { CopyTitleLinkFailure } from "@/storage/types";
 import { createNotifications, ToastHost } from "@/ui/toast";
 import { coerceLinkFormat, type LinkFormat } from "@/utils/link_format";
-
-function replaceHash(nextHash: string): void {
-  try {
-    if (window.location.hash === nextHash) {
-      return;
-    }
-    window.history.replaceState(null, "", nextHash);
-  } catch {
-    window.location.hash = nextHash;
-  }
-}
 
 function canUseChromeAction(runtime: { isExtensionPage: boolean }): boolean {
   return (
@@ -219,7 +209,7 @@ export function PopupApp(): React.JSX.Element {
   }, [syncFromHash]);
 
   useEffect(() => {
-    replaceHash(`#${tabValue}`);
+    replaceHashSafely(window, `#${tabValue}`);
   }, [tabValue]);
 
   useEffect(() => {

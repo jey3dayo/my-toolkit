@@ -1,3 +1,5 @@
+import { replaceHashSafely } from "@/popup/hash";
+
 export type PopupNavigationEnvironment = {
   isExtensionPage: boolean;
   storagePrefix: string;
@@ -119,17 +121,6 @@ function getTargetFromHash(
   return hash;
 }
 
-function safelyReplaceHash(window: Window, nextHash: string): void {
-  try {
-    if (window.location.hash === nextHash) {
-      return;
-    }
-    window.history.replaceState(null, "", nextHash);
-  } catch {
-    window.location.hash = nextHash;
-  }
-}
-
 type MenuDrawerApi = {
   closeMenu: () => void;
   openMenu: () => void;
@@ -157,19 +148,28 @@ function applyMenuOpenState(elements: NavigationElements, open: boolean): void {
   }
 }
 
+function focusSoon(
+  env: PopupNavigationEnvironment,
+  resolveTarget: () => HTMLElement | null
+): void {
+  env.window.setTimeout(() => {
+    resolveTarget()?.focus();
+  }, 0);
+}
+
 function focusFirstItemInMenuSoon(
   env: PopupNavigationEnvironment,
   elements: NavigationElements
 ): void {
-  env.window.setTimeout(() => {
-    const focusTarget =
+  focusSoon(env, () => {
+    return (
       elements.menuClose ||
       (elements.menuDrawer?.querySelector<HTMLElement>(
         'a[href],button,[tabindex]:not([tabindex="-1"])'
       ) ??
-        null);
-    focusTarget?.focus();
-  }, 0);
+        null)
+    );
+  });
 }
 
 function moveFocusOutOfMenuIfNeeded(
@@ -201,7 +201,7 @@ function restoreFocusAfterCloseSoon(
   elements: NavigationElements,
   lastActiveElement: HTMLElement | null
 ): void {
-  env.window.setTimeout(() => {
+  focusSoon(env, () => {
     let focusTarget = lastActiveElement;
     if (focusTarget && !focusTarget.isConnected) {
       focusTarget = null;
@@ -212,8 +212,8 @@ function restoreFocusAfterCloseSoon(
     if (!focusTarget) {
       focusTarget = elements.sidebarToggle;
     }
-    focusTarget?.focus();
-  }, 0);
+    return focusTarget;
+  });
 }
 
 function setupMenuDrawer(
@@ -320,7 +320,7 @@ function setupTabs(
       }
 
       setActive(elements, targetId);
-      safelyReplaceHash(env.window, `#${targetId}`);
+      replaceHashSafely(env.window, `#${targetId}`);
     });
   }
 
