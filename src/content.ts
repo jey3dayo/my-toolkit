@@ -334,6 +334,9 @@ const SOURCE_SUFFIX_REGEX = /（(?:選択範囲|ページ本文)）\s*$/;
     host.id = TOAST_HOST_ID;
 
     const shadow = host.shadowRoot ?? host.attachShadow({ mode: "open" });
+    if (!host.isConnected) {
+      (document.documentElement ?? document.body ?? document).appendChild(host);
+    }
     ensureShadowUiBaseStyles(shadow);
     applyTheme(currentTheme, shadow);
 
@@ -353,10 +356,6 @@ const SOURCE_SUFFIX_REGEX = /（(?:選択範囲|ページ本文)）\s*$/;
         portalContainer: shadow,
       })
     );
-
-    if (!host.isConnected) {
-      (document.documentElement ?? document.body ?? document).appendChild(host);
-    }
 
     globalState.toastMount = {
       host,
@@ -494,6 +493,9 @@ const SOURCE_SUFFIX_REGEX = /（(?:選択範囲|ページ本文)）\s*$/;
     host.id = OVERLAY_HOST_ID;
 
     const shadow = host.shadowRoot ?? host.attachShadow({ mode: "open" });
+    if (!host.isConnected) {
+      (document.documentElement ?? document.body ?? document).appendChild(host);
+    }
     ensureShadowUiBaseStyles(shadow);
     applyTheme(currentTheme, shadow);
 
@@ -507,10 +509,6 @@ const SOURCE_SUFFIX_REGEX = /（(?:選択範囲|ページ本文)）\s*$/;
     }
 
     const root = createRoot(rootEl);
-
-    if (!host.isConnected) {
-      (document.documentElement ?? document.body ?? document).appendChild(host);
-    }
 
     globalState.overlayMount = { host, shadow, root };
     return globalState.overlayMount;

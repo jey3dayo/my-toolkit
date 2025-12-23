@@ -15,6 +15,7 @@ type Props = {
   className?: string;
   testId?: string;
   active?: boolean;
+  describedById?: string;
 };
 
 export function ThemeCycleButton({
@@ -23,12 +24,14 @@ export function ThemeCycleButton({
   className,
   testId,
   active,
+  describedById,
 }: Props): React.JSX.Element {
   const label = themeButtonLabel(theme);
   const isActive = active ?? theme !== "auto";
 
   return (
     <Button
+      aria-describedby={describedById}
       aria-label={label}
       className={className}
       data-active={isActive ? "true" : undefined}

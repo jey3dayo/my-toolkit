@@ -420,6 +420,25 @@ function OverlayCopyButton(props: OverlayCopyButtonProps): React.JSX.Element {
   );
 }
 
+type OverlayPopoverProps = {
+  id: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+};
+
+function OverlayPopover(props: OverlayPopoverProps): React.JSX.Element {
+  return (
+    <div className="mbu-overlay-popover">
+      {props.children}
+      <div className="mbu-overlay-popover-content" id={props.id} role="tooltip">
+        <div className="mbu-overlay-popover-title">{props.title}</div>
+        <div className="mbu-overlay-popover-text">{props.description}</div>
+      </div>
+    </div>
+  );
+}
+
 type OverlayEventModeActionsProps = {
   canOpenCalendar: boolean;
   canDownloadIcs: boolean;
@@ -598,6 +617,8 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
   const [theme, setTheme] = useState<Theme>(() => themeFromHost(props.host));
   const panelRef = useRef<HTMLDivElement | null>(null);
   const pinPopoverId = useId();
+  const themePopoverId = useId();
+  const closePopoverId = useId();
   const [panelSize, setPanelSize] = useState<PanelSize>({
     width: 520,
     height: 300,
@@ -831,7 +852,11 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
             </div>
           </div>
           <div className="mbu-overlay-actions">
-            <div className="mbu-overlay-popover">
+            <OverlayPopover
+              description="右上に固定します。もう一度クリックで解除。"
+              id={pinPopoverId}
+              title="ピン留め"
+            >
               <Button
                 aria-describedby={pinPopoverId}
                 aria-label={pinned ? "右上固定を解除" : "右上に固定"}
@@ -844,33 +869,37 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
               >
                 <PinIcon />
               </Button>
-              <div
-                className="mbu-overlay-popover-content"
-                id={pinPopoverId}
-                role="tooltip"
-              >
-                <div className="mbu-overlay-popover-title">ピン留め</div>
-                <div className="mbu-overlay-popover-text">
-                  右上に固定します。もう一度クリックで解除。
-                </div>
-              </div>
-            </div>
-            <ThemeCycleButton
-              className="mbu-overlay-action mbu-overlay-icon-button"
-              onToggle={toggleTheme}
-              testId="overlay-theme"
-              theme={theme}
-            />
-            <Button
-              aria-label="閉じる"
-              className="mbu-overlay-action mbu-overlay-icon-button"
-              data-testid="overlay-close"
-              onClick={props.onDismiss}
-              title="閉じる"
-              type="button"
+            </OverlayPopover>
+            <OverlayPopover
+              description="自動・ライト・ダークを順に切り替えます。"
+              id={themePopoverId}
+              title="テーマ切り替え"
             >
-              ×
-            </Button>
+              <ThemeCycleButton
+                className="mbu-overlay-action mbu-overlay-icon-button"
+                describedById={themePopoverId}
+                onToggle={toggleTheme}
+                testId="overlay-theme"
+                theme={theme}
+              />
+            </OverlayPopover>
+            <OverlayPopover
+              description="オーバーレイを閉じます。"
+              id={closePopoverId}
+              title="閉じる"
+            >
+              <Button
+                aria-describedby={closePopoverId}
+                aria-label="閉じる"
+                className="mbu-overlay-action mbu-overlay-icon-button"
+                data-testid="overlay-close"
+                onClick={props.onDismiss}
+                title="閉じる"
+                type="button"
+              >
+                ×
+              </Button>
+            </OverlayPopover>
           </div>
         </div>
 

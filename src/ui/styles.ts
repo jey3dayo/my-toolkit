@@ -113,6 +113,45 @@ function ensureShadowStyleText(
   shadowRoot.appendChild(style);
 }
 
+const FALLBACK_MBU_TOKENS: Record<string, string> = {
+  "--mbu-bg": "var(--color-bg, #0f1724)",
+  "--mbu-surface": "var(--color-surface, #1b2334)",
+  "--mbu-surface-2": "var(--color-surface-2, #232d42)",
+  "--mbu-border": "var(--color-border-ui, rgba(255, 255, 255, 0.12))",
+  "--mbu-text": "var(--color-text, #f6f7fb)",
+  "--mbu-text-muted": "var(--color-text-muted, #c8d0e5)",
+  "--mbu-accent": "var(--color-primary, #3ecf8e)",
+  "--mbu-danger": "var(--color-danger, #e57373)",
+  "--mbu-radius": "var(--radius-lg, 14px)",
+  "--mbu-shadow": "var(--shadow-elevation, 0 12px 40px rgba(0, 0, 0, 0.35))",
+  "--mbu-focus-ring": "var(--focus-ring, 2px solid rgba(123, 220, 247, 0.55))",
+  "--mbu-focus-ring-offset": "var(--focus-ring-offset, 2px)",
+  "--mbu-toast-screen-inset": "var(--toast-screen-inset, 12px 12px auto auto)",
+  "--mbu-toast-surface-inset":
+    "var(--toast-surface-inset, 12px 12px auto auto)",
+};
+
+function ensureShadowFallbackTokens(shadowRoot: ShadowRoot): void {
+  const host = shadowRoot.host;
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+  const computed =
+    shadowRoot.ownerDocument.defaultView?.getComputedStyle?.(host) ?? null;
+  if (!computed) {
+    return;
+  }
+  const surface = computed.getPropertyValue("--mbu-surface").trim();
+  if (surface) {
+    return;
+  }
+  for (const [name, value] of Object.entries(FALLBACK_MBU_TOKENS)) {
+    if (!host.style.getPropertyValue(name)) {
+      host.style.setProperty(name, value);
+    }
+  }
+}
+
 export function ensurePopupUiBaseStyles(doc: Document): void {
   ensureDocumentStylesheet(
     doc,
@@ -147,6 +186,20 @@ export function ensurePopupUiBaseStyles(doc: Document): void {
 }
 
 export function ensureShadowUiBaseStyles(shadowRoot: ShadowRoot): void {
+  const hasShadowTokens = (): boolean => {
+    if (typeof getComputedStyle !== "function") {
+      return true;
+    }
+    const host = shadowRoot.host;
+    if (!(host instanceof HTMLElement && host.isConnected)) {
+      return true;
+    }
+    const value = getComputedStyle(host)
+      .getPropertyValue("--mbu-surface")
+      .trim();
+    return value.length > 0;
+  };
+
   if (
     shadowConstructedSheets &&
     "adoptedStyleSheets" in shadowRoot &&
@@ -168,10 +221,14 @@ export function ensureShadowUiBaseStyles(shadowRoot: ShadowRoot): void {
     if (changed) {
       shadowRoot.adoptedStyleSheets = next;
     }
-    return;
+    if (hasShadowTokens()) {
+      return;
+    }
   }
 
   ensureShadowStyleText(shadowRoot, TOKEN_PRIMITIVES_ID, primitivesCss);
   ensureShadowStyleText(shadowRoot, TOKEN_SEMANTIC_ID, semanticCss);
   ensureShadowStyleText(shadowRoot, STYLE_ID, componentsCss);
+
+  ensureShadowFallbackTokens(shadowRoot);
 }
