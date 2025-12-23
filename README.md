@@ -43,7 +43,7 @@
    - `pnpm run build`（`dist/` を生成）
 2. Chrome で `chrome://extensions/` を開く
 3. **デベロッパーモード** を有効化
-4. **パッケージ化されていない拡張機能を読み込む** をクリックし、`browser-toolkit` フォルダを選択
+4. **パッケージ化されていない拡張機能を読み込む** をクリックし、`manifest.json` がある `browser-toolkit/` のルートを選択（`dist/` や `dist/Chrome` ではなくリポジトリ直下）
 
 ## 使い方
 
