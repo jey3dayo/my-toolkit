@@ -7,6 +7,10 @@ import {
   type PopupChromeStub,
 } from "./helpers/popupChromeStub";
 import { createPopupDom } from "./helpers/popupDom";
+import {
+  cleanupPopupTestHooks,
+  registerPopupTestHooks,
+} from "./helpers/popupTestHooks";
 
 (
   globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -83,6 +87,7 @@ describe("popup Actions pane: event output", () => {
     vi.stubGlobal("document", dom.window.document);
     vi.stubGlobal("navigator", dom.window.navigator);
     vi.stubGlobal("chrome", chromeStub);
+    registerPopupTestHooks();
 
     Object.defineProperty(dom.window.navigator, "clipboard", {
       configurable: true,
@@ -108,6 +113,7 @@ describe("popup Actions pane: event output", () => {
   });
 
   afterEach(() => {
+    cleanupPopupTestHooks();
     vi.unstubAllGlobals();
   });
 

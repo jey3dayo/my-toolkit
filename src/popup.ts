@@ -18,7 +18,22 @@ async function initTheme(): Promise<void> {
 }
 
 (() => {
+  type PopupTestHooks = {
+    unmount?: () => void;
+  };
+
+  const testHooks = (
+    globalThis as unknown as { __MBU_TEST_HOOKS__?: PopupTestHooks }
+  ).__MBU_TEST_HOOKS__;
+
+  let root: ReturnType<typeof createRoot> | null = null;
+  let started = false;
+
   const start = (): void => {
+    if (started) {
+      return;
+    }
+    started = true;
     ensurePopupUiBaseStyles(document);
     applyTheme("auto", document);
     initTheme().catch(() => {
@@ -35,8 +50,22 @@ async function initTheme(): Promise<void> {
       throw new Error("Missing #root element in popup.html");
     }
 
-    createRoot(rootEl).render(createElement(PopupApp));
+    root = createRoot(rootEl);
+    root.render(createElement(PopupApp));
   };
+
+  const unmount = (): void => {
+    if (!started) {
+      document.removeEventListener("DOMContentLoaded", start);
+      return;
+    }
+    root?.unmount();
+    root = null;
+  };
+
+  if (testHooks) {
+    testHooks.unmount = unmount;
+  }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", start);
