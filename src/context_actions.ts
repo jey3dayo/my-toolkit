@@ -1,5 +1,5 @@
-import { CODE_REVIEW_PROMPT } from "@/context_action_prompts";
 import {
+  CODE_REVIEW_PROMPT,
   SUMMARIZE_PROMPT,
   TRANSLATE_JA_PROMPT,
 } from "@/prompts/context_actions";
