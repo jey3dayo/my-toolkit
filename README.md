@@ -79,6 +79,15 @@
 - pnpm `10.26.0`
 - `mise`（任意・推奨。ツールバージョンを揃えるため）
 
+### セットアップ
+
+1. `mise` を使う場合は `mise trust` でリポジトリを信頼します（シェル起動時のエラー回避）。
+2. 依存関係をインストールします: `pnpm install`
+3. ローカルで検証する場合はウォッチビルドまたは Storybook を起動します:
+   - `pnpm run watch`（content script / popup のバンドルを watch）
+   - `pnpm run storybook`（UI をブラウザで確認）
+4. 準備ができたら `pnpm run build` を実行し、`dist/` を Chrome に読み込みます。
+
 ### コマンド
 
 基本は `mise` タスクを使います:
