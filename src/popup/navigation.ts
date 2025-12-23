@@ -216,7 +216,7 @@ function restoreFocusAfterCloseSoon(
   });
 }
 
-function setupMenuDrawer(
+function createMenuDrawerApi(
   env: PopupNavigationEnvironment,
   elements: NavigationElements
 ): MenuDrawerApi {
@@ -251,47 +251,58 @@ function setupMenuDrawer(
     openMenu();
   };
 
-  elements.sidebarToggle?.addEventListener("click", () => {
-    toggleMenu();
-  });
-
-  elements.menuClose?.addEventListener("click", () => {
-    closeMenu();
-  });
-
-  elements.menuScrim?.addEventListener("click", () => {
-    closeMenu();
-  });
-
-  env.window.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") {
-      return;
-    }
-    closeMenu();
-  });
-
-  // ドロワー内のメニュー選択後は閉じる
-  elements.menuDrawer?.addEventListener("click", (event) => {
-    const target = event.target as HTMLElement | null;
-    if (!target) {
-      return;
-    }
-    const menuItem = target.closest<HTMLElement>("[data-target]");
-    if (!menuItem) {
-      return;
-    }
-    closeMenu();
-  });
-
-  // 通常ページ（file:// など）で開いた場合は初期状態で閉じておく
-  applyMenuOpenState(elements, false);
-
   return {
     closeMenu,
     openMenu,
     toggleMenu,
     isOpen: () => isMenuOpen(elements),
   };
+}
+
+function registerMenuDrawerHandlers(
+  env: PopupNavigationEnvironment,
+  elements: NavigationElements,
+  menu: MenuDrawerApi
+): void {
+  const closeMenu = (): void => {
+    menu.closeMenu();
+  };
+
+  if (elements.sidebarToggle) {
+    elements.sidebarToggle.addEventListener("click", menu.toggleMenu);
+  }
+
+  for (const target of [elements.menuClose, elements.menuScrim]) {
+    target?.addEventListener("click", closeMenu);
+  }
+
+  env.window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeMenu();
+    }
+  });
+
+  // ドロワー内のメニュー選択後は閉じる
+  elements.menuDrawer?.addEventListener("click", (event) => {
+    const menuItem =
+      (event.target as HTMLElement | null)?.closest<HTMLElement>(
+        "[data-target]"
+      ) ?? null;
+    if (menuItem) {
+      closeMenu();
+    }
+  });
+}
+
+function setupMenuDrawer(
+  env: PopupNavigationEnvironment,
+  elements: NavigationElements
+): MenuDrawerApi {
+  const menu = createMenuDrawerApi(env, elements);
+  registerMenuDrawerHandlers(env, elements, menu);
+  // 通常ページ（file:// など）で開いた場合は初期状態で閉じておく
+  applyMenuOpenState(elements, false);
+  return menu;
 }
 
 function setupTabs(

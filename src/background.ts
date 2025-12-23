@@ -1250,46 +1250,53 @@ function renderInstructionTemplate(
   return rendered.trim();
 }
 
+async function resolveOpenAiToken(
+  tokenOverride?: string
+): Promise<Result.Result<string, string>> {
+  const overrideToken = tokenOverride?.trim() ?? "";
+  if (overrideToken) {
+    return Result.succeed(overrideToken);
+  }
+
+  try {
+    const data = (await storageLocalGet([
+      "openaiApiToken",
+    ])) as LocalStorageData;
+    const storedToken = data.openaiApiToken?.trim() ?? "";
+    if (!storedToken) {
+      return Result.fail(
+        "OpenAI API Tokenが未設定です（ポップアップの「設定」タブで設定してください）"
+      );
+    }
+    return Result.succeed(storedToken);
+  } catch (error) {
+    return Result.fail(
+      toErrorMessage(error, "OpenAI設定の読み込みに失敗しました")
+    );
+  }
+}
+
 async function testOpenAiToken(
   tokenOverride?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const overrideToken = tokenOverride?.trim() ?? "";
-
-  const tokenResult = overrideToken
-    ? Result.succeed(overrideToken)
-    : Result.pipe(
-        Result.try({
-          immediate: true,
-          try: () => storageLocalGet(["openaiApiToken"]),
-          catch: (error) =>
-            toErrorMessage(error, "OpenAI設定の読み込みに失敗しました"),
-        }),
-        Result.map(
-          (data) => (data as LocalStorageData).openaiApiToken?.trim() ?? ""
-        ),
-        Result.andThen((storedToken) =>
-          storedToken
-            ? Result.succeed(storedToken)
-            : Result.fail(
-                "OpenAI API Tokenが未設定です（ポップアップの「設定」タブで設定してください）"
-              )
-        )
-      );
-
-  const token = await tokenResult;
-  if (Result.isFailure(token)) {
-    return { ok: false, error: token.error };
+  const tokenResult = await resolveOpenAiToken(tokenOverride);
+  if (Result.isFailure(tokenResult)) {
+    return { ok: false, error: tokenResult.error };
   }
 
-  const checkResult = await fetchOpenAiChatCompletionOk(fetch, token.value, {
-    model: await loadOpenAiModel(storageLocalGetTyped),
-    max_completion_tokens: 5,
-    temperature: 0,
-    messages: [
-      { role: "system", content: "You are a health check bot." },
-      { role: "user", content: "Reply with OK." },
-    ],
-  });
+  const checkResult = await fetchOpenAiChatCompletionOk(
+    fetch,
+    tokenResult.value,
+    {
+      model: await loadOpenAiModel(storageLocalGetTyped),
+      max_completion_tokens: 5,
+      temperature: 0,
+      messages: [
+        { role: "system", content: "You are a health check bot." },
+        { role: "user", content: "Reply with OK." },
+      ],
+    }
+  );
 
   if (Result.isFailure(checkResult)) {
     return { ok: false, error: checkResult.error };
@@ -1590,11 +1597,38 @@ function buildCalendarArtifacts(
   return { eventText, calendarUrl, ics, errors };
 }
 
-function buildGoogleCalendarUrl(event: ExtractedEvent): string | null {
-  const title = event.title?.trim() || "予定";
-  const details = event.description?.trim() || "";
-  const location = event.location?.trim() || "";
+type GoogleCalendarRange = NonNullable<
+  ReturnType<typeof computeEventDateRange>
+>;
 
+function formatGoogleCalendarDates(range: GoogleCalendarRange): string {
+  if (range.kind === "allDay") {
+    return `${range.startYyyyMmDd}/${range.endYyyyMmDdExclusive}`;
+  }
+  return `${range.startUtc}/${range.endUtc}`;
+}
+
+function buildGoogleCalendarParams(
+  event: ExtractedEvent,
+  dates: string
+): URLSearchParams {
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: event.title?.trim() || "予定",
+    dates,
+  });
+  const details = event.description?.trim();
+  if (details) {
+    params.set("details", details);
+  }
+  const location = event.location?.trim();
+  if (location) {
+    params.set("location", location);
+  }
+  return params;
+}
+
+function buildGoogleCalendarUrl(event: ExtractedEvent): string | null {
   const range = computeEventDateRange({
     start: event.start,
     end: event.end,
@@ -1603,22 +1637,7 @@ function buildGoogleCalendarUrl(event: ExtractedEvent): string | null {
   if (!range) {
     return null;
   }
-  const dates =
-    range.kind === "allDay"
-      ? `${range.startYyyyMmDd}/${range.endYyyyMmDdExclusive}`
-      : `${range.startUtc}/${range.endUtc}`;
-
-  const params = new URLSearchParams({
-    action: "TEMPLATE",
-    text: title,
-    dates,
-  });
-  if (details) {
-    params.set("details", details);
-  }
-  if (location) {
-    params.set("location", location);
-  }
-
+  const dates = formatGoogleCalendarDates(range);
+  const params = buildGoogleCalendarParams(event, dates);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
