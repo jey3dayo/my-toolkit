@@ -653,6 +653,105 @@
   line-height: 1.5;
 }
 
+.mbu-overlay-primary-markdown {
+  white-space: normal;
+}
+
+.mbu-overlay-primary-markdown > :first-child {
+  margin-top: 0;
+}
+
+.mbu-overlay-primary-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.mbu-overlay-primary-markdown p {
+  margin: 0 0 8px;
+}
+
+.mbu-overlay-primary-markdown ul,
+.mbu-overlay-primary-markdown ol {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+.mbu-overlay-primary-markdown li + li {
+  margin-top: 4px;
+}
+
+.mbu-overlay-primary-markdown a {
+  color: var(--mbu-accent);
+  text-decoration: underline;
+}
+
+.mbu-overlay-primary-markdown code {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 12px;
+  word-break: normal;
+  background: color-mix(in oklab, var(--mbu-surface) 75%, transparent);
+  border: 1px solid var(--mbu-border);
+  padding: 1px 4px;
+  border-radius: 6px;
+}
+
+.mbu-overlay-primary-markdown pre {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--mbu-border);
+  background: color-mix(in oklab, var(--mbu-surface) 85%, transparent);
+  overflow: auto;
+  white-space: pre;
+  word-break: normal;
+}
+
+.mbu-overlay-primary-markdown pre code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+}
+
+.mbu-overlay-primary-markdown blockquote {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-left: 3px solid
+    color-mix(in oklab, var(--mbu-accent) 55%, var(--mbu-border));
+  background: color-mix(in oklab, var(--mbu-accent) 8%, var(--mbu-surface));
+  border-radius: 10px;
+}
+
+.mbu-overlay-primary-markdown hr {
+  margin: 8px 0;
+  border: none;
+  border-top: 1px solid var(--mbu-border);
+}
+
+.mbu-overlay-primary-markdown table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0 0 8px;
+  border: 1px solid var(--mbu-border);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.mbu-overlay-primary-markdown th,
+.mbu-overlay-primary-markdown td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--mbu-border);
+  text-align: left;
+}
+
+.mbu-overlay-primary-markdown tr:last-child th,
+.mbu-overlay-primary-markdown tr:last-child td {
+  border-bottom: none;
+}
+
 .mbu-overlay-secondary-text {
   color: var(--mbu-text-muted);
   font-size: 12px;

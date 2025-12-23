@@ -7,7 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { AuxTextDisclosure } from "@/components/AuxTextDisclosure";
+import { Icon } from "@/components/icon";
 import { ThemeCycleButton } from "@/components/ThemeCycleButton";
 import { CopyIcon, PinIcon } from "@/content/overlay/icons";
 import type { ExtractedEvent, Size, SummarySource } from "@/shared_types";
@@ -537,6 +540,7 @@ type OverlayTextContentProps = {
   primary: string;
   secondaryText: string;
   selectionText: string;
+  markdownView: boolean;
   onCopyPrimary: () => void;
 };
 
@@ -549,7 +553,22 @@ function OverlayTextDetails(props: OverlayTextDetailsProps): React.JSX.Element {
         <div className="mbu-overlay-status">{props.statusLabel}</div>
       ) : null}
       <div className="mbu-overlay-primary-block">
-        <pre className="mbu-overlay-primary-text">{props.primary}</pre>
+        {props.markdownView ? (
+          <div className="mbu-overlay-primary-text mbu-overlay-primary-markdown">
+            <ReactMarkdown
+              components={{
+                a: ({ node: _node, ...linkProps }) => (
+                  <a {...linkProps} rel="noreferrer" target="_blank" />
+                ),
+              }}
+              remarkPlugins={[remarkGfm]}
+            >
+              {props.primary}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <pre className="mbu-overlay-primary-text">{props.primary}</pre>
+        )}
         {props.mode === "event" || !props.canCopyPrimary ? null : (
           <OverlayCopyButton
             disabled={!props.canCopyPrimary}
@@ -599,6 +618,7 @@ function OverlayBody(props: OverlayBodyProps): React.JSX.Element {
       ) : (
         <OverlayTextDetails
           canCopyPrimary={props.canCopyPrimary}
+          markdownView={props.markdownView}
           mode={props.mode}
           onCopyPrimary={props.onCopyPrimary}
           primary={props.primary}
@@ -615,9 +635,11 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
   const { toastManager, notify } = useMemo(() => createNotifications(), []);
   const viewModel = props.viewModel;
   const [theme, setTheme] = useState<Theme>(() => themeFromHost(props.host));
+  const [markdownView, setMarkdownView] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const pinPopoverId = useId();
   const themePopoverId = useId();
+  const markdownPopoverId = useId();
   const closePopoverId = useId();
   const [panelSize, setPanelSize] = useState<PanelSize>({
     width: 520,
@@ -819,6 +841,10 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
     });
   };
 
+  const toggleMarkdownView = (): void => {
+    setMarkdownView((current) => !current);
+  };
+
   const sourceLabel = sourceLabelFromSource(viewModel.source);
   const statusLabel = statusLabelFromStatus(viewModel.status);
   const { selectionText, secondaryText } = deriveSecondaryText(
@@ -828,6 +854,7 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
   const canCopyPrimary = canCopyPrimaryFromViewModel(viewModel);
   const canOpenCalendar = canOpenCalendarFromViewModel(viewModel);
   const canDownloadIcs = canDownloadIcsFromViewModel(viewModel);
+  const showMarkdownToggle = viewModel.mode === "text";
 
   return (
     <div className="mbu-overlay-surface">
@@ -883,6 +910,37 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
                 theme={theme}
               />
             </OverlayPopover>
+            {showMarkdownToggle ? (
+              <OverlayPopover
+                description="Markdown表示とシンプル表示を切り替えます。"
+                id={markdownPopoverId}
+                title="表示切り替え"
+              >
+                <Button
+                  aria-describedby={markdownPopoverId}
+                  aria-label={
+                    markdownView
+                      ? "シンプル表示に切り替え"
+                      : "Markdown表示に切り替え"
+                  }
+                  className="mbu-overlay-action mbu-overlay-icon-button"
+                  data-active={markdownView ? "true" : undefined}
+                  data-testid="overlay-markdown"
+                  onClick={toggleMarkdownView}
+                  title={
+                    markdownView
+                      ? "シンプル表示に切り替え"
+                      : "Markdown表示に切り替え"
+                  }
+                  type="button"
+                >
+                  <Icon
+                    aria-hidden="true"
+                    name={markdownView ? "eye" : "eye-off"}
+                  />
+                </Button>
+              </OverlayPopover>
+            ) : null}
             <OverlayPopover
               description="オーバーレイを閉じます。"
               id={closePopoverId}
@@ -907,6 +965,7 @@ export function OverlayApp(props: Props): React.JSX.Element | null {
           canCopyPrimary={canCopyPrimary}
           canDownloadIcs={canDownloadIcs}
           canOpenCalendar={canOpenCalendar}
+          markdownView={markdownView}
           mode={viewModel.mode}
           onCopyPrimary={onCopyPrimary}
           onDownloadIcs={downloadIcs}
