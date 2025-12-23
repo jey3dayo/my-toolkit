@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   detect-changes:
-    name: Prep: Detect Changes
+    name: "Prep: Detect Changes"
     runs-on: ubuntu-latest
     outputs:
       docs-only: ${{ steps.changes.outputs.docs-only }}
@@ -30,7 +30,7 @@ jobs:
         uses: ./.github/actions/detect-changes
 
   actionlint:
-    name: Check: Actionlint
+    name: "Check: Actionlint"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: detect-changes
@@ -44,7 +44,7 @@ jobs:
         uses: rhysd/actionlint@v1.7.9
 
   lint:
-    name: Check: Lint
+    name: "Check: Lint"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: detect-changes
@@ -61,7 +61,7 @@ jobs:
         run: pnpm lint
 
   test:
-    name: Check: Test
+    name: "Check: Test"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: detect-changes
@@ -78,7 +78,7 @@ jobs:
         run: pnpm test
 
   build:
-    name: Check: Build
+    name: "Check: Build"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: detect-changes
@@ -95,7 +95,7 @@ jobs:
         run: pnpm build
 
   storybook:
-    name: Check: Storybook
+    name: "Check: Storybook"
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: detect-changes
@@ -115,7 +115,7 @@ jobs:
         run: pnpm test-storybook
 
   docs-quality-gate:
-    name: Gate: Docs-Only
+    name: "Gate: Docs-Only"
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.docs-only == 'true'
