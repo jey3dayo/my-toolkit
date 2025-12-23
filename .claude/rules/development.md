@@ -15,7 +15,7 @@
 ## 🏗️ プロジェクト構造
 
 ```
-my-toolkit/
+browser-toolkit/
 ├── .claude/
 │   └── rules/          # 開発ルール（このディレクトリ）
 ├── dist/               # ビルド出力（自動生成）

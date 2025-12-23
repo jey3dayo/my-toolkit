@@ -2,7 +2,7 @@
 
 ## Project Description (Input)
 
-あなたは Codex CLI（実装担当）です。リポジトリ `/Users/t00114/src/github.com/jey3dayo/my-toolkit` を編集して、Chrome拡張の UI（Popup + content script overlay）を「新しめの Base UI」を使って React 実装にリプレイスし、全体を最新化してください。 個人開発なのでスピード優先でガツガツ行ってOKです（ただし壊さない/通すべきものは通す）。 あわせて、以下も必ず活用してください：
+あなたは Codex CLI（実装担当）です。リポジトリ `/Users/t00114/src/github.com/jey3dayo/browser-toolkit` を編集して、Chrome拡張の UI（Popup + content script overlay）を「新しめの Base UI」を使って React 実装にリプレイスし、全体を最新化してください。 個人開発なのでスピード優先でガツガツ行ってOKです（ただし壊さない/通すべきものは通す）。 あわせて、以下も必ず活用してください：
 
 - mcp chrome-devtools（UIの実機検証・DOM/Style/Accessibility確認・挙動デバッグに使用）
 - `~/.claude/plugins/frontend-design/skills/frontend-design/SKILL.md`（設計/実装ガイドとして参照し、推奨プラクティスに従う）

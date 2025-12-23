@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "My Toolkit",
+  "name": "Browser Toolkit",
   "version": "0.1.0",
   "description": "個人用のブラウザユーティリティ集（テーブルソート、AI連携など）",
   "permissions": ["activeTab", "contextMenus", "storage"],

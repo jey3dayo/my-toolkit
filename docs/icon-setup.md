@@ -5,7 +5,7 @@
 ## 📁 ディレクトリ構成
 
 ```
-my-toolkit/
+browser-toolkit/
 ├── icons/              # 拡張機能のアイコン（manifest.json用）
 │   ├── icon16.png     # ツールバー用（16x16）
 │   ├── icon48.png     # 拡張機能管理画面用（48x48）

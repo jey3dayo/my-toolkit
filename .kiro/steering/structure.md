@@ -1,4 +1,4 @@
-# Structure Steering: My Toolkit
+# Structure Steering: Browser Toolkit
 
 ## High-level Organization
 

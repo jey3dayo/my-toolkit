@@ -1,5 +1,5 @@
 {
-  "name": "my-toolkit",
+  "name": "browser-toolkit",
   "version": "1.0.0",
   "description": "個人用のツールキット Chrome拡張機能（テーブルソート、AI連携など）",
   "main": "dist/background.js",

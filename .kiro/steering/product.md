@@ -1,8 +1,8 @@
-# Product Steering: My Toolkit
+# Product Steering: Browser Toolkit
 
 ## Purpose
 
-My Toolkit is a personal Chrome extension that adds small, high-leverage utilities directly to the pages you use, with minimal setup and no external backend.
+Browser Toolkit is a personal Chrome extension that adds small, high-leverage utilities directly to the pages you use, with minimal setup and no external backend.
 
 ## Primary Value
 
