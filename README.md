@@ -86,7 +86,7 @@
 3. ローカルで検証する場合はウォッチビルドまたは Storybook を起動します:
    - `pnpm run watch`（content script / popup のバンドルを watch）
    - `pnpm run storybook`（UI をブラウザで確認）
-4. 準備ができたら `pnpm run build` を実行し、`dist/` を Chrome に読み込みます。
+4. 準備ができたら `pnpm run build` を実行し、`manifest.json` があるリポジトリ直下（`browser-toolkit/`）を Chrome に読み込みます（`dist/` ではありません）。
 
 ### コマンド
 
